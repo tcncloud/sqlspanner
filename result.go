@@ -3,7 +3,7 @@ package sqlspanner
 import "fmt"
 
 type result struct {
-	lastId *int64
+	lastId       *int64
 	rowsAffected *int64
 }
 
@@ -17,8 +17,8 @@ func (r *result) LastInsertId() (int64, error) {
 
 func (r *result) RowsAffected() (int64, error) {
 	if r.rowsAffected != nil {
-		return *r.rowsAffected
+		return *r.rowsAffected, nil
 	} else {
-		return 0, fmt.Errof("no rows affected set")
+		return 0, fmt.Errorf("no rows affected set")
 	}
 }

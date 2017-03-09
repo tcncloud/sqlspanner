@@ -9,6 +9,7 @@ import (
 )
 
 var unimplemented = fmt.Errorf("unimplemented")
+var unsupported = fmt.Errorf("unsupported")
 
 type conn struct {
 	ctx    context.Context
@@ -28,5 +29,5 @@ func (c *conn) Begin() (driver.Tx, error) {
 }
 
 func (c *conn) BeginTx(ctx context.Context, opts driver.TxOptions) (driver.Tx, error) {
-	return newTransaction(c, ctx, opts)
+	return newTransaction(c, ctx, &opts)
 }
