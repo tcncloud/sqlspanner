@@ -3,7 +3,9 @@ package sqlspanner
 import (
 	"context"
 	"database/sql/driver"
+	"errors"
 
+	"github.com/Sirupsen/logrus"
 	"github.com/xwb1989/sqlparser"
 
 	"cloud.google.com/go/spanner"
@@ -56,4 +58,32 @@ func (c *conn) Ping(ctx context.Context) error {
 		return driver.ErrBadConn
 	}
 	return nil
+}
+
+func (c *conn) Exec(query string, args []driver.Value) (driver.Result, error) {
+	logrus.WithFields(logrus.Fields{
+		"query": query,
+		"args":  args,
+	}).Debug("Executing query")
+	pstmt, err := sqlparser.Parse(query)
+	if err != nil {
+
+		return nil, err
+	}
+
+	switch pstmt.(type) {
+	case *sqlparser.Insert:
+		logrus.Debug("is an insert query")
+		return c.executeInsertQuery(pstmt.(*sqlparser.Insert), args)
+	case *sqlparser.Update:
+	case *sqlparser.Delete:
+	default:
+	}
+
+	return nil, errors.New(UnimplementedError)
+}
+
+func (c *conn) executeInsertQuery(insert *sqlparser.Insert, args []driver.Value) (driver.Result, error) {
+	logrus.WithField("stmt", insert).Debug("insert statement")
+	return nil, errors.New(UnimplementedError)
 }
