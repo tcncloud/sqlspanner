@@ -1,24 +1,28 @@
 package sqlspanner
 
-import(
-	"database/sql"
+import (
+	"context"
 	"database/sql/driver"
-	"cloud.google.com/go/spanner"
+	"fmt"
 )
 
-type tx struct{
+const UnsupportedError = fmt.Errorf("Unsupported")
+
+type tx struct {
 	opts *driver.TxOptions
-	c *conn
-	ctx context.Context
+	c    *conn
+	ctx  context.Context
 }
-func newTransaction(c *conn, ctx context.Context, opts *driver.TxOptions) (tx, error) {
-	t := tx{
+
+func newTransaction(c *conn, ctx context.Context, opts *driver.TxOptions) (driver.Tx, error) {
+	t := &tx{
 		opts: opts,
-		c: c,
-		ctx: ctx,
+		c:    c,
+		ctx:  ctx,
 	}
 	return t, nil
 }
+
 // there is no Commit  in spanner, so this should just release its resources
 func (t *tx) Commit() error {
 	t = nil
@@ -26,6 +30,5 @@ func (t *tx) Commit() error {
 }
 
 func (t *tx) Rollback() error {
-	return unsupported
+	return UnsupportedError
 }
-
