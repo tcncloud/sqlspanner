@@ -3,10 +3,8 @@ package sqlspanner
 import (
 	"context"
 	"database/sql/driver"
-	"fmt"
+	"errors"
 )
-
-const UnsupportedError = fmt.Errorf("Unsupported")
 
 type tx struct {
 	opts *driver.TxOptions
@@ -30,5 +28,5 @@ func (t *tx) Commit() error {
 }
 
 func (t *tx) Rollback() error {
-	return UnsupportedError
+	return errors.New(UnsupportedError)
 }
