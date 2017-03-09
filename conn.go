@@ -3,15 +3,12 @@ package sqlspanner
 import (
 	"context"
 	"database/sql/driver"
-	"fmt"
+	"errors"
 
 	"github.com/xwb1989/sqlparser"
 
 	"cloud.google.com/go/spanner"
 )
-
-var unimplemented = fmt.Errorf("unimplemented")
-var unsupported = fmt.Errorf("unsupported")
 
 type conn struct {
 	ctx    context.Context
@@ -30,11 +27,11 @@ func (c *conn) Prepare(query string) (driver.Stmt, error) {
 	if err != nil {
 		return nil, err
 	}
-	return nil, unimplemented
+	return nil, errors.New(UnimplementedError)
 }
 
 func (c *conn) Close() error {
-	return unimplemented
+	return errors.New(UnimpletedError)
 }
 
 func (c *conn) Begin() (driver.Tx, error) {
