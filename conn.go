@@ -31,7 +31,7 @@ func (c *conn) Prepare(query string) (driver.Stmt, error) {
 }
 
 func (c *conn) Close() error {
-	return errors.New(UnimpletedError)
+	return errors.New(UnimplementedError)
 }
 
 func (c *conn) Begin() (driver.Tx, error) {

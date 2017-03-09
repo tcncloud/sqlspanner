@@ -8,7 +8,7 @@ import (
 type stmt struct{}
 
 func (s *stmt) Close() error {
-	return errors.New(UnimpletedError)
+	return errors.New(UnimplementedError)
 }
 
 func (s *stmt) NumInput() int {
@@ -16,9 +16,9 @@ func (s *stmt) NumInput() int {
 }
 
 func (s *stmt) Exec(args []driver.Value) (driver.Result, error) {
-	return nil, errors.New(UnimpletedError)
+	return nil, errors.New(UnimplementedError)
 }
 
 func (s *stmt) Query(args []driver.Value) (driver.Rows, error) {
-	return nil, errors.New(UnimpletedError)
+	return nil, errors.New(UnimplementedError)
 }
