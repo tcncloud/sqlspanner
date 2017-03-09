@@ -14,7 +14,7 @@ type tx struct {
 	ctx  context.Context
 }
 
-func newTransaction(c *conn, ctx context.Context, opts *driver.TxOptions) (*tx, error) {
+func newTransaction(c *conn, ctx context.Context, opts *driver.TxOptions) (driver.Tx, error) {
 	t := &tx{
 		opts: opts,
 		c:    c,
