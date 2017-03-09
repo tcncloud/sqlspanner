@@ -5,6 +5,8 @@ import (
 	"database/sql/driver"
 	"fmt"
 
+	"github.com/xwb1989/sqlparser"
+
 	"cloud.google.com/go/spanner"
 )
 
@@ -17,6 +19,17 @@ type conn struct {
 }
 
 func (c *conn) Prepare(query string) (driver.Stmt, error) {
+	stmt, err := sqlparser.Parse(query)
+	switch stmt.(type) {
+	case *sqlparser.Insert:
+	case *sqlparser.Update:
+	case *sqlparser.Delete:
+	default:
+	}
+
+	if err != nil {
+		return nil, err
+	}
 	return nil, unimplemented
 }
 
