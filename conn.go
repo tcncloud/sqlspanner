@@ -3,15 +3,13 @@ package sqlspanner
 import (
 	"context"
 	"database/sql/driver"
-	"fmt"
+	"errors"
 
+	"github.com/Sirupsen/logrus"
 	"github.com/xwb1989/sqlparser"
 
 	"cloud.google.com/go/spanner"
 )
-
-var unimplemented = fmt.Errorf("unimplemented")
-var unsupported = fmt.Errorf("unsupported")
 
 type conn struct {
 	ctx    context.Context
@@ -19,28 +17,73 @@ type conn struct {
 }
 
 func (c *conn) Prepare(query string) (driver.Stmt, error) {
-	stmt, err := sqlparser.Parse(query)
-	switch stmt.(type) {
+	pstmt, err := sqlparser.Parse(query)
+	if err != nil {
+		return nil, err
+	}
+
+	return &stmt{
+		conn:            c,
+		parsedStatement: pstmt,
+		origQuery:       query,
+	}, nil
+}
+
+func (c *conn) Close() error {
+	if c.client != nil {
+		c.client.Close()
+	}
+	return nil
+}
+
+func (c *conn) Begin() (driver.Tx, error) {
+	return newTransaction(context.Background(), c, nil)
+}
+
+func (c *conn) BeginTx(ctx context.Context, opts driver.TxOptions) (driver.Tx, error) {
+	return newTransaction(ctx, c, &opts)
+}
+
+func (c *conn) Ping(ctx context.Context) error {
+	stmt := spanner.Statement{SQL: "SELECT 1"}
+	iter := c.client.Single().Query(c.ctx, stmt)
+	defer iter.Stop()
+	row, err := iter.Next()
+	if err != nil {
+		return driver.ErrBadConn
+	}
+
+	var i int64
+	if row.Columns(&i) != nil {
+		return driver.ErrBadConn
+	}
+	return nil
+}
+
+func (c *conn) Exec(query string, args []driver.Value) (driver.Result, error) {
+	logrus.WithFields(logrus.Fields{
+		"query": query,
+		"args":  args,
+	}).Debug("Executing query")
+	pstmt, err := sqlparser.Parse(query)
+	if err != nil {
+
+		return nil, err
+	}
+
+	switch pstmt.(type) {
 	case *sqlparser.Insert:
+		logrus.Debug("is an insert query")
+		return c.executeInsertQuery(pstmt.(*sqlparser.Insert), args)
 	case *sqlparser.Update:
 	case *sqlparser.Delete:
 	default:
 	}
 
-	if err != nil {
-		return nil, err
-	}
-	return nil, unimplemented
+	return nil, errors.New(UnimplementedError)
 }
 
-func (c *conn) Close() error {
-	return unimplemented
-}
-
-func (c *conn) Begin() (driver.Tx, error) {
-	return newTransaction(c, context.Background(), nil)
-}
-
-func (c *conn) BeginTx(ctx context.Context, opts driver.TxOptions) (driver.Tx, error) {
-	return newTransaction(c, ctx, &opts)
+func (c *conn) executeInsertQuery(insert *sqlparser.Insert, args []driver.Value) (driver.Result, error) {
+	logrus.WithField("stmt", insert).Debug("insert statement")
+	return nil, errors.New(UnimplementedError)
 }

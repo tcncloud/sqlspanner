@@ -1,11 +1,20 @@
 package sqlspanner
 
-import "database/sql/driver"
+import (
+	"database/sql/driver"
+	"errors"
 
-type stmt struct{}
+	"github.com/xwb1989/sqlparser"
+)
+
+type stmt struct {
+	conn            *conn
+	parsedStatement sqlparser.Statement
+	origQuery       string
+}
 
 func (s *stmt) Close() error {
-	return unimplemented
+	return errors.New(UnimplementedError)
 }
 
 func (s *stmt) NumInput() int {
@@ -13,9 +22,9 @@ func (s *stmt) NumInput() int {
 }
 
 func (s *stmt) Exec(args []driver.Value) (driver.Result, error) {
-	return nil, unimplemented
+	return nil, errors.New(UnimplementedError)
 }
 
 func (s *stmt) Query(args []driver.Value) (driver.Rows, error) {
-	return nil, unimplemented
+	return nil, errors.New(UnimplementedError)
 }

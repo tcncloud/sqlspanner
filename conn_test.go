@@ -1,26 +1,26 @@
 package sqlspanner_test
 
 import (
-	"fmt"
+	_ "github.com/tcncloud/sqlspanner"
 
-	// . "github.com/tcncloud/sqlspanner"
-	"github.com/xwb1989/sqlparser"
+	"database/sql"
 
 	. "github.com/onsi/ginkgo"
-	// . "github.com/onsi/gomega"
+	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("Conn", func() {
-	Describe("Parse()", func() {
-		Describe("given a select statement", func() {
-			It("should parse into *sqlparser.Select", func() {
-				stmt, _ := sqlparser.Parse("SELECT * FROM test")
-				switch stmt.(type) {
-				case *sqlparser.Select:
-					fmt.Print("Select stmt")
-				}
-			})
+	Describe("given a db connection ", func() {
+		conn, err := sql.Open("spanner", "projects/algebraic-ratio-149721/instances/test-instance/databases/test-project")
+		It("should connect succesfuly", func() {
+			Expect(err).To(BeNil())
 		})
-
+		It("should be able to ping", func() {
+			Expect(conn.Ping()).To(BeNil())
+		})
+		It("should be able to execute an insert statement", func() {
+			_, err := conn.Exec("INSERT INTO test_table1(id, simple_string) VALUES(?, ?)", 1, "test_string")
+			Expect(err).To(BeNil())
+		})
 	})
 })

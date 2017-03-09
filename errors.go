@@ -1,5 +1,6 @@
 package sqlspanner
 
 const (
-	UnsupportedError = "Unsupported"
+	UnsupportedError   = "Unsupported"
+	UnimplementedError = "Unimplemented"
 )

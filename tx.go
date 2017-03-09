@@ -12,7 +12,7 @@ type tx struct {
 	ctx  context.Context
 }
 
-func newTransaction(c *conn, ctx context.Context, opts *driver.TxOptions) (driver.Tx, error) {
+func newTransaction(ctx context.Context, c *conn, opts *driver.TxOptions) (driver.Tx, error) {
 	t := &tx{
 		opts: opts,
 		c:    c,
@@ -23,7 +23,7 @@ func newTransaction(c *conn, ctx context.Context, opts *driver.TxOptions) (drive
 
 // there is no Commit  in spanner, so this should just release its resources
 func (t *tx) Commit() error {
-	t = nil
+	// t = nil
 	return nil
 }
 

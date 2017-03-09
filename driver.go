@@ -5,8 +5,14 @@ import (
 	"database/sql"
 	"database/sql/driver"
 
+	"github.com/Sirupsen/logrus"
+
 	"cloud.google.com/go/spanner"
 )
+
+func init() {
+	logrus.SetLevel(logrus.DebugLevel)
+}
 
 type drv struct{}
 
@@ -15,6 +21,7 @@ func init() {
 }
 
 func (d *drv) Open(name string) (driver.Conn, error) {
+	logrus.WithField("spanner db path", name).Debug("database connection")
 	ctx := context.Background()
 	client, err := spanner.NewClient(ctx, name)
 	if err != nil {
