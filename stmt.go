@@ -3,9 +3,15 @@ package sqlspanner
 import (
 	"database/sql/driver"
 	"errors"
+
+	"github.com/xwb1989/sqlparser"
 )
 
-type stmt struct{}
+type stmt struct {
+	conn            *conn
+	parsedStatement sqlparser.Statement
+	origQuery       string
+}
 
 func (s *stmt) Close() error {
 	return errors.New(UnimplementedError)
