@@ -1,13 +1,18 @@
 package sqlspanner
 
 import (
+	"context"
 	"database/sql/driver"
 	"fmt"
+
+	"cloud.google.com/go/spanner"
 )
 
 var unimplemented = fmt.Errorf("unimplemented")
 
 type conn struct {
+	ctx    context.Context
+	client *spanner.Client
 }
 
 func (c *conn) Prepare(query string) (driver.Stmt, error) {
