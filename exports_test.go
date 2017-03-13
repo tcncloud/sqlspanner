@@ -18,7 +18,10 @@ type TestNextable struct {
 func (n *TestNextable) Next() (*spanner.Row, error) {
 	if n.cur < n.max {
 		n.cur += 1
-		return spanner.NewRow([]string{"a", "b", "c"}, []interface{}{"1", "2", []string{"123", "456"}})
+		return spanner.NewRow([]string{ "a", "b", "c", "d", "e", "f", "g", "h", "i", "j" },
+		[]interface{}{true, int64(2), float64(3.3), "1", []byte( "bytes" ),
+		[]bool{ true, true }, []int64{ 2, 2 }, []float64{ 3.3, 3.3 },
+		[]string{"1", "1"}, [][]byte{ []byte("bytes"), []byte("bytes") }})
 		//messyStr := [][]string{ []string { "123", "456" }, []string{ "78", "910" } }
 		//return spanner.NewRow([]string{"a", "b", "c"}, []interface{}{"1", "2", messyStr })
 	}
