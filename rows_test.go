@@ -3,6 +3,7 @@ package sqlspanner_test
 import (
 	"database/sql/driver"
 	"io"
+	"fmt"
 	"github.com/Sirupsen/logrus"
 	"github.com/tcncloud/sqlspanner"
 
@@ -37,20 +38,23 @@ var _ = Describe("Rows", func() {
 				})
 			})
 			Describe("with full iterator", func() {
-				It("sets cols field", func() {
-
+				next := sqlspanner.NewTestNextable(2)
+				rows := sqlspanner.NewRowsFromNextable(next)
+				It("has columns", func() {
+					Expect(rows.Columns()).To(BeEquivalentTo([]string{"a", "b", "c"}))
 				})
 
-				It("sets row field", func() {
-
-				})
-
-				It("does not set err field", func() {
-
-				})
-
-				It("sets valuer field", func() {
-
+				It("gets next for number of rows that are in iterator", func() {
+					for i:= 0; i < 2; i++ {
+						row := make([]driver.Value, 3)
+						err := rows.Next(row)
+						Expect(err).To(BeZero())
+						fmt.Printf("row: %#v\n", row)
+						//TODO: Test that interfaces come back, not GenericColumnValues
+					}
+					row := make([]driver.Value, 3)
+					err := rows.Next(row)
+					Expect(err).To(BeEquivalentTo(io.EOF))
 				})
 			})
 		})
