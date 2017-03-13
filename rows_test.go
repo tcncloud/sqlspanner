@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"github.com/Sirupsen/logrus"
 	"github.com/tcncloud/sqlspanner"
-	"cloud.google.com/go/spanner"
+	//"cloud.google.com/go/spanner"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -16,24 +16,6 @@ func init() {
 }
 
 var _ = Describe("Rows", func() {
-	WhatTestRowShouldBe := []driver.Value{true, int64(2), float64(3.3), "1",
-		[]byte( "bytes" ), []spanner.NullBool{
-			spanner.NullBool{ Bool: true, Valid: true },
-			spanner.NullBool{ Bool: true, Valid: true },
-		}, []spanner.NullInt64{
-			spanner.NullInt64{ Int64: int64(2), Valid: true },
-			spanner.NullInt64{ Int64: int64(2), Valid: true },
-		}, []spanner.NullFloat64{
-			spanner.NullFloat64{ Float64: float64(3.3), Valid: true },
-			spanner.NullFloat64{ Float64: float64(3.3), Valid: true },
-		}, []spanner.NullString{
-			spanner.NullString{ StringVal: "1", Valid: true },
-			spanner.NullString{ StringVal: "1", Valid: true },
-		}, [][]byte{
-			[]byte( "bytes" ),
-			[]byte( "bytes" ),
-		},
-	}
 	Describe("New Rows", func() {
 		Describe("with a valid row iterator", func() {
 			// grab spanner's row iterator
@@ -42,7 +24,7 @@ var _ = Describe("Rows", func() {
 		})
 		Describe("with nextable interface", func() {
 			Describe("with empty iterator", func() {
-				next := sqlspanner.NewTestNextable(0)
+				next := sqlspanner.NewTestNextable(0, "values")
 				rows := sqlspanner.NewRowsFromNextable(next)
 				It("does not have columns ", func() {
 					cols := rows.Columns()
@@ -57,23 +39,46 @@ var _ = Describe("Rows", func() {
 				})
 			})
 			Describe("with full iterator", func() {
-				next := sqlspanner.NewTestNextable(2)
-				rows := sqlspanner.NewRowsFromNextable(next)
-				It("has columns", func() {
-					Expect(rows.Columns()).To(BeEquivalentTo([]string{ "a", "b", "c", "d", "e", "f", "g", "h", "i", "j" }))
-				})
+				Describe(`with values that are types:
+						string, int64, float64, []byte, bool, []bool, []int64, []float64, []string, [][]byte`, func() {
+					next := sqlspanner.NewTestNextable(2, "values")
+					rows := sqlspanner.NewRowsFromNextable(next)
+					It("has columns", func() {
+						Expect(rows.Columns()).To(BeEquivalentTo([]string{
+							"a", "b", "c", "d", "e",
+							"f", "g", "h", "i", "j",
+						}))
+					})
 
-				It("gets next for number of rows that are in iterator", func() {
-					for i:= 0; i < 2; i++ {
+					It("gets correct []driver.Value for number of rows that are in iterator", func() {
+						for i:= 0; i < 2; i++ {
+							row := make([]driver.Value, 10)
+							err := rows.Next(row)
+							Expect(err).To(BeZero())
+							fmt.Printf("row: %#v, \n\n%+v\n\n", row, row)
+							Expect(row).To(BeEquivalentTo(next.WhatValueRowShouldBe()))
+						}
 						row := make([]driver.Value, 10)
 						err := rows.Next(row)
-						Expect(err).To(BeZero())
-						fmt.Printf("row: %#v, \n\n%+v\n\n", row, row)
-						Expect(row).To(BeEquivalentTo(WhatTestRowShouldBe))
-					}
-					row := make([]driver.Value, 10)
-					err := rows.Next(row)
-					Expect(err).To(BeEquivalentTo(io.EOF))
+						Expect(err).To(BeEquivalentTo(io.EOF))
+					})
+				})
+
+				Describe(`with values that are types: civil.Date, time.Time, []civil.Date, []time.Time`, func() {
+					next := sqlspanner.NewTestNextable(2, "times")
+					rows := sqlspanner.NewRowsFromNextable(next)
+					It("gets correct []driver.Value for number of rows that are in iterator", func() {
+						for i:= 0; i < 2; i++ {
+							row := make([]driver.Value, 4)
+							err := rows.Next(row)
+							Expect(err).To(BeZero())
+							fmt.Printf("row: %#v, \n\n%+v\n\n", row, row)
+							Expect(row).To(BeEquivalentTo(next.WhatTimeRowShouldBe()))
+						}
+						row := make([]driver.Value, 4)
+						err := rows.Next(row)
+						Expect(err).To(BeEquivalentTo(io.EOF))
+					})
 				})
 			})
 		})
