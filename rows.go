@@ -32,9 +32,7 @@ func newRowsFromNextable(iter nextable) *rows {
 		return r
 	}
 
-	fmt.Printf("new::: row: %+v  err:%+v  iter: %+v\n", r.row, r.err, r.iter)
 	r.iterate()
-	fmt.Printf("after iter::: row: %+v  err:%+v  iter: %+v\n", r.row, r.err, r.iter)
 	if r.err == nil {
 		r.cols = r.row.ColumnNames()
 	}
@@ -61,7 +59,6 @@ func (r *rows) iterate() {
 		//get the first row result now, so we can get the column names
 		// r.row only will exist if r.done is false
 		row, err := r.iter.Next()
-		fmt.Printf("iterate row: %+v  err: %+v\n", row, err)
 		if err == iterator.Done {
 			r.err = io.EOF
 		} else if err != nil {
@@ -70,7 +67,6 @@ func (r *rows) iterate() {
 			r.row = row
 		}
 	}
-	fmt.Printf("at end of iterate: row: %+v, err: %+v \n", r.row, r.err)
 }
 
 // because of how Next, and iterate work,  r.row  will always exist at this point
@@ -82,10 +78,15 @@ func (r *rows) handleRow(dest []driver.Value) {
 	for i := 0; i < row.Size(); i++ {
 		pointers[i] = new(spanner.GenericColumnValue)
 	}
+	// convert pointers to []interface{}
+	interfaces := make([]interface{}, len(pointers))
+	for i, v := range pointers {
+		interfaces[i] = v
+	}
 	//read all the columns from the row
-	row.Columns(pointers)
+	row.Columns(interfaces...)
 	for i, col := range pointers {
-		driverVal, err := r.valuer.ConvertValue(col)
+		driverVal, err := r.valuer.ConvertGenericCol(col)
 		if err != nil {
 			// abort everything ever for this iterator
 			r.err = err
@@ -97,17 +98,13 @@ func (r *rows) handleRow(dest []driver.Value) {
 }
 
 func (r *rows) Next(dest []driver.Value) error {
-	fmt.Printf("row: %+v  err:%+v  iter: %+v\n", r.row, r.err, r.iter)
 	switch {
 	case r.row != nil: // first row gotten by an interator will be handled this way
-		fmt.Printf("took row not nil path\n")
 		r.handleRow(dest)
 		return r.err
 	case r.err != nil: // always return the last error we were given
-		fmt.Printf("took err path\n")
 		return r.err
 	default:
-		fmt.Printf("took default\n")
 		r.iterate()
 		if r.err != nil {
 			return r.err
@@ -127,6 +124,17 @@ func (r *rows) Close() error {
 	}
 	return nil
 }
+
+// driver.Rows  is casted to driver.RowsNextResultSet  in the database/sql lib
+// so even though spanner doesn't have multiple result sets, we have to implment this here.
+func (r *rows) HasNextResultSet() bool {
+	return false
+}
+
+func (r *rows) NextResultSet() error {
+	return nil
+}
+
 
 // So I don't have to be given a spanner.RowIterator,  I could be given anything
 // that returns a spanner.Row, and an error
