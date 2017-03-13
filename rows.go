@@ -5,7 +5,6 @@ import (
 	"database/sql/driver"
 	"google.golang.org/api/iterator"
 	"io"
-	"fmt"
 )
 
 type rows struct {
