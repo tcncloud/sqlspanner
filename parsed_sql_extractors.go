@@ -2,6 +2,8 @@ package sqlspanner
 
 import(
 	"fmt"
+	"strconv"
+	"database/sql/driver"
 	"github.com/xwb1989/sqlparser"
 	"github.com/Sirupsen/logrus"
 )
@@ -46,22 +48,30 @@ func extractInsertColumns(insert *sqlparser.Insert) ([]string, error) {
 // does not support:
 // - empty table name ex. (INSERT INTO "" (...))
 // - table name qualifiers ex. (INSERT INTO table_name as t1 (...))
-func extractInsertTableName(insert *sqlparser.Insert) (*string, error) {
+func extractInsertTableName(insert *sqlparser.Insert) (string, error) {
 	if insert.Table == nil {
-		return nil, fmt.Errorf("TableName node cannot be nil")
+		return "", fmt.Errorf("TableName node cannot be nil")
 	}
 	if len(insert.Table.Qualifier) != 0 {
 		fmt.Printf("table qualifier: %s", string(insert.Table.Qualifier[:]))
-		return nil, fmt.Errorf("Table Name Qualifiers are not supported for insert queries")
+		return "", fmt.Errorf("Table Name Qualifiers are not supported for insert queries")
 	}
 	if len(insert.Table.Name) == 0 {
-		return nil, fmt.Errorf("Table name cannot be empty for insert queries")
+		return "", fmt.Errorf("Table name cannot be empty for insert queries")
 	}
-	ret := string(insert.Table.Name[:])
-	return &ret, nil
+	return string(insert.Table.Name[:]), nil
 }
 
-func extractInsertRows(insert *sqlparser.Insert) ([]string, error) {
+// takes driver args, and an inset query,  and returns the arguments to insert query in spanner
+// ? values will be filled in with a value from args
+// providing NULL will return a nil in the return interface
+// does not support:
+// - subqueries
+// - lists (if you want to insert an array,  use ?, and provide the value yourself)
+// - referencing other columns
+// - tuples
+// - Binary, Unary, Function, or Case expressions
+func extractInsertValues(insert *sqlparser.Insert, args []driver.Value) ([]interface{}, error) {
 	rows := insert.Rows
 	switch rowType := rows.(type) {
 	case *sqlparser.Select, *sqlparser.Union:
@@ -75,21 +85,38 @@ func extractInsertRows(insert *sqlparser.Insert) ([]string, error) {
 		switch valType := rt.(type) {
 		case *sqlparser.Subquery:
 			return nil, fmt.Errorf("insert queries cannot have subqueries")
-		case sqlparser.ValTuple:
+		case sqlparser.ValTuple:// a number
 			fmt.Printf("is ValTuple %+v\n", valType)
+
 			valExp := sqlparser.ValExprs(valType)
 			valExps := ([]sqlparser.ValExpr)(valExp)
-			//rowValues := make([]string, len(valExps))
-			for _, ve := range valExps {
-				switch ve.(type) {
-				case sqlparser.StrVal:
-					fmt.Printf("StrVal %+v\n",ve)
+			rowValues := make([]interface{}, len(valExps))
+
+			curArg := 0
+
+			for i, ve := range valExps {
+				switch value := ve.(type) {
+				case sqlparser.StrVal:// a quoted string
+					rowValues[i] = string(value[:])
 				case sqlparser.NumVal:
-					fmt.Printf("NumVal %+v\n",ve)
-				case sqlparser.ValArg:
-					fmt.Printf("ValArg %+v\n",ve)
+					rv, err := strconv.ParseInt(string(value[:]), 10, 64)
+					if err != nil {
+						rv, err := strconv.ParseFloat(string(value[:]), 64)
+						if err != nil {
+							return nil, fmt.Errorf("could not parse number value as int or float")
+						}
+						rowValues[i] = rv
+					} else {
+						rowValues[i] = rv
+					}
+				case sqlparser.ValArg:// a ?
+					if curArg >= len(args) {
+						return nil, fmt.Errorf("not enough arguments suplied to match query")
+					}
+					rowValues[i] = args[curArg]
+					curArg++
 				case *sqlparser.NullVal:
-					fmt.Printf("NullVal %+v\n",ve)
+					rowValues[i] = nil
 				case *sqlparser.ColName:
 					fmt.Printf("ColName %+v\n",ve)
 				case sqlparser.ValTuple:
@@ -108,10 +135,9 @@ func extractInsertRows(insert *sqlparser.Insert) ([]string, error) {
 					fmt.Printf("CaseExpr %+v\n",ve)
 				}
 			}
-			return nil, nil
+			return rowValues, nil
 		}
-		return nil, nil
 	}
-	return nil, nil
+	return nil, fmt.Errorf("insert query not compatable with spanner insert")
 }
 
