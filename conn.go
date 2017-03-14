@@ -95,11 +95,24 @@ func (c *conn) executeInsertQuery(insert *sqlparser.Insert, args []driver.Value)
 		return nil, err
 	}
 	logrus.WithField("tableName", tableName).Debug("table name")
-	rows, err := extractInsertRows(insert)
+	values, err := extractInsertValues(insert, args)
 	if err != nil {
 		return nil, err
 	}
-	logrus.WithField("rows", rows).Debug("rows")
-	return nil, errors.New(UnimplementedError)
+	logrus.WithField("values", values).Debug("values")
+	// create a spanner mutation for the insert query
+	muts := make([]*spanner.Mutation, 1)
+	muts[0] = spanner.Insert(tableName, colNames, values)
+	// should probably support different contexts for querying spanner, inserts, deletes, and updates are slow
+	_, err = c.client.Apply(context.Background(), muts)
+	if err != nil {
+		return nil, err
+	}
+	//TODO:  find the last inserted id, and put it on the result
+	rowsAffected := int64(1)
+	return &result{
+		lastID: nil,
+		rowsAffected: &rowsAffected,
+	}, nil
 }
 
