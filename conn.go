@@ -85,5 +85,21 @@ func (c *conn) Exec(query string, args []driver.Value) (driver.Result, error) {
 
 func (c *conn) executeInsertQuery(insert *sqlparser.Insert, args []driver.Value) (driver.Result, error) {
 	logrus.WithField("stmt", insert).Debug("insert statement")
+	colNames, err := extractInsertColumns(insert)
+	if err != nil {
+		return nil, err
+	}
+	logrus.WithField("cols", colNames).Debug("column names")
+	tableName, err := extractInsertTableName(insert)
+	if err != nil {
+		return nil, err
+	}
+	logrus.WithField("tableName", tableName).Debug("table name")
+	rows, err := extractInsertRows(insert)
+	if err != nil {
+		return nil, err
+	}
+	logrus.WithField("rows", rows).Debug("rows")
 	return nil, errors.New(UnimplementedError)
 }
+
