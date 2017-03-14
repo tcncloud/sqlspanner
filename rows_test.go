@@ -3,7 +3,7 @@ package sqlspanner_test
 import (
 	"database/sql/driver"
 	"io"
-	"fmt"
+	//"fmt"
 	"github.com/Sirupsen/logrus"
 	"github.com/tcncloud/sqlspanner"
 	//"cloud.google.com/go/spanner"
@@ -55,7 +55,7 @@ var _ = Describe("Rows", func() {
 							row := make([]driver.Value, 10)
 							err := rows.Next(row)
 							Expect(err).To(BeZero())
-							fmt.Printf("row: %#v, \n\n%+v\n\n", row, row)
+							//fmt.Printf("row: %#v, \n\n%+v\n\n", row, row)
 							Expect(row).To(BeEquivalentTo(next.WhatValueRowShouldBe()))
 						}
 						row := make([]driver.Value, 10)
@@ -72,7 +72,7 @@ var _ = Describe("Rows", func() {
 							row := make([]driver.Value, 4)
 							err := rows.Next(row)
 							Expect(err).To(BeZero())
-							fmt.Printf("row: %#v, \n\n%+v\n\n", row, row)
+							//fmt.Printf("row: %#v, \n\n%+v\n\n", row, row)
 							Expect(row).To(BeEquivalentTo(next.WhatTimeRowShouldBe()))
 						}
 						row := make([]driver.Value, 4)
