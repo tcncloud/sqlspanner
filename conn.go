@@ -133,8 +133,8 @@ func (c *conn) executeDeleteQuery(del *sqlparser.Delete, args []driver.Value) (d
 	for _, key := range keyset.Keys {
 		muts = append(muts, spanner.Delete(tableName, key))
 	}
-	for _, keyrange := range keyset.Ranges {
-		muts = append(muts, spanner.Delete(tablename, keyrange))
+	for _, keyRange := range keyset.Ranges {
+		muts = append(muts, spanner.DeleteKeyRange(tableName, keyRange))
 	}
 	_, err = c.client.Apply(context.Background(), muts)
 	if err != nil {
