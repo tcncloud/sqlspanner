@@ -153,6 +153,19 @@ func extractInsertValues(insert *sqlparser.Insert, args []driver.Value) ([]inter
 	return nil, fmt.Errorf("insert query not compatable with spanner insert")
 }
 
-func extractSpannerKeyFromDelete(del *sqlparser.Delete) (spanner.Key, error) {
+func extractSpannerKeyFromDelete(del *sqlparser.Delete) (spanner.KeySet, error) {
+	where := del.Where
+	if where == nil {
+		return nil, fmt.Errorf("Must include a where clause that contain primary keys in delete statement")
+	}
+	switch expr := where.Expr.(type) {
+	case *sqlparser.AndExpr:
+	case *sqlparser.OrExpr:
+	case *sqlparser.ParenBoolExpr:
+	case *sqlparser.ComparisonExpr:
+	case *sqlparser.RangeCond:
+	case *sqlparser.NullCheck:
+	case *sqlparser.ExistsExpr:
+	}
 	return nil, fmt.Errorf("unimplemented")
 }
