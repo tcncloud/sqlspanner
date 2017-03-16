@@ -44,25 +44,34 @@ func extractInsertColumns(insert *sqlparser.Insert) ([]string, error) {
 	return colNames, nil
 }
 
-// extracts a valid table name for an insert query
+// extracts a valid table name for an insert/update query
 // does not support:
 // - empty table name ex. (INSERT INTO "" (...))
 // - table name qualifiers ex. (INSERT INTO table_name as t1 (...))
-func extractInsertTableName(insert *sqlparser.Insert) (string, error) {
-	if insert.Table == nil {
+func extractInsertOrUpdateTableName(st sqlparser.Statement) (string, error) {
+	var table *sqlparser.TableName
+	switch stmt := st.(type) {
+	case *sqlparser.Insert:
+		table = stmt.Table
+	case *sqlparser.Update:
+		table = stmt.Table
+	default:
+		return "", fmt.Errorf("not a insert/update statment")
+	}
+	if table == nil {
 		return "", fmt.Errorf("TableName node cannot be nil")
 	}
-	if len(insert.Table.Qualifier) != 0 {
-		fmt.Printf("table qualifier: %s", string(insert.Table.Qualifier[:]))
-		return "", fmt.Errorf("Table Name Qualifiers are not supported for insert queries")
+	if len(table.Qualifier) != 0 {
+		fmt.Printf("table qualifier: %s", string(table.Qualifier[:]))
+		return "", fmt.Errorf("Table Name Qualifiers are not supported for insert/update queries")
 	}
-	if len(insert.Table.Name) == 0 {
-		return "", fmt.Errorf("Table name cannot be empty for insert queries")
+	if len(table.Name) == 0 {
+		return "", fmt.Errorf("Table name cannot be empty for insert/update queries")
 	}
-	return string(insert.Table.Name[:]), nil
+	return string(table.Name[:]), nil
 }
 
-// takes driver args, and an inset query,  and returns the arguments to insert query in spanner
+// takes driver args, and an inset query,  and returns the arguments to insert query in spanner.
 // ? values will be filled in with a value from args
 // providing NULL will return a nil in the return interface
 // does not support:
