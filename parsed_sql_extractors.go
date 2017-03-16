@@ -159,7 +159,15 @@ func extractSpannerKeyFromDelete(del *sqlparser.Delete) (*spanner.KeySet, error)
 		return nil, fmt.Errorf("Must include a where clause that contain primary keys in delete statement")
 	}
 	fmt.Printf("where type: %+v\n", where.Type)
-	switch expr := where.Expr.(type) {
+	keyset, err := getSpannerKeySetFromBoolExpr(where.Expr)
+	if err != nil {
+		return nil, err
+	}
+	return keyset, fmt.Errorf("unimplemented")
+}
+
+func getSpannerKeySetFromBoolExpr(boolExpr sqlparser.BoolExpr) (*spanner.KeySet, error) {
+	switch expr := boolExpr.(type) {
 	case *sqlparser.AndExpr:
 		fmt.Printf("AndExpr %#v\n", expr)
 	case *sqlparser.OrExpr:
@@ -175,5 +183,5 @@ func extractSpannerKeyFromDelete(del *sqlparser.Delete) (*spanner.KeySet, error)
 	case *sqlparser.ExistsExpr:
 		fmt.Printf("ExistsExpr %#v\n", expr)
 	}
-	return nil, fmt.Errorf("unimplemented")
+	return nil, fmt.Errorf("not a boolexpr")
 }
