@@ -71,8 +71,8 @@ func (c *conn) Exec(query string, args []driver.Value) (driver.Result, error) {
 		return nil, err
 	}
 
-	switch pstmt.(type) {
-	case stmt := *sqlparser.Insert:
+	switch stmt := pstmt.(type) {
+	case *sqlparser.Insert:
 		logrus.Debug("is an insert query")
 		return c.executeInsertQuery(stmt, args)
 	case *sqlparser.Update:
@@ -119,7 +119,7 @@ func (c *conn) executeInsertQuery(insert *sqlparser.Insert, args []driver.Value)
 }
 
 func (c *conn) executeDeleteQuery(del *sqlparser.Delete, args []driver.Value) (driver.Result, error) {
-	logrus.WithFiled("stmt", del).Debug("delete statment")
+	logrus.WithField("stmt", del).Debug("delete statment")
 	tableName, err := extractIUDTableName(del)
 	if err != nil {
 		return nil, err
@@ -137,8 +137,8 @@ func (c *conn) executeDeleteQuery(del *sqlparser.Delete, args []driver.Value) (d
 	}
 	rowsAffected := int64(1)
 	return &result{
-		lastId: nil,
+		lastID: nil,
 		rowsAffected: &rowsAffected,
-	}
+	}, nil
 }
 

@@ -6,6 +6,7 @@ import(
 	"database/sql/driver"
 	"github.com/xwb1989/sqlparser"
 	"github.com/Sirupsen/logrus"
+	"cloud.google.com/go/spanner"
 )
 
 //  extracts the column names used in an insert query.  Does not support:
@@ -153,5 +154,5 @@ func extractInsertValues(insert *sqlparser.Insert, args []driver.Value) ([]inter
 }
 
 func extractSpannerKeyFromDelete(del *sqlparser.Delete) (spanner.Key, error) {
-	return nil, fmt.Errof("unimplemented")
+	return nil, fmt.Errorf("unimplemented")
 }
