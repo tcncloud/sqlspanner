@@ -129,6 +129,7 @@ func (c *conn) executeDeleteQuery(del *sqlparser.Delete, args []driver.Value) (d
 	if err != nil {
 		return nil, err
 	}
+	logrus.WithField("keyset", keyset).Debug("keyset")
 	muts := make([]*spanner.Mutation, 0)
 	for _, key := range keyset.Keys {
 		muts = append(muts, spanner.Delete(tableName, key))
