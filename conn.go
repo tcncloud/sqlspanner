@@ -90,7 +90,7 @@ func (c *conn) executeInsertQuery(insert *sqlparser.Insert, args []driver.Value)
 		return nil, err
 	}
 	logrus.WithField("cols", colNames).Debug("column names")
-	tableName, err := extractInsertOrUpdateTableName(insert)
+	tableName, err := extractIUDTableName(insert)
 	if err != nil {
 		return nil, err
 	}

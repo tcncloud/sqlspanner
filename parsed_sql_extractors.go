@@ -44,16 +44,18 @@ func extractInsertColumns(insert *sqlparser.Insert) ([]string, error) {
 	return colNames, nil
 }
 
-// extracts a valid table name for an insert/update query
+// extracts a valid table name for an insert/update/delete query
 // does not support:
 // - empty table name ex. (INSERT INTO "" (...))
 // - table name qualifiers ex. (INSERT INTO table_name as t1 (...))
-func extractInsertOrUpdateTableName(st sqlparser.Statement) (string, error) {
+func extractIUDTableName(st sqlparser.Statement) (string, error) {
 	var table *sqlparser.TableName
 	switch stmt := st.(type) {
 	case *sqlparser.Insert:
 		table = stmt.Table
 	case *sqlparser.Update:
+		table = stmt.Table
+	case *sqlparser.Delete:
 		table = stmt.Table
 	default:
 		return "", fmt.Errorf("not a insert/update statment")
