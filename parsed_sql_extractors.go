@@ -152,3 +152,6 @@ func extractInsertValues(insert *sqlparser.Insert, args []driver.Value) ([]inter
 	return nil, fmt.Errorf("insert query not compatable with spanner insert")
 }
 
+func extractSpannerKeyFromDelete(del *sqlparser.Delete) (spanner.Key, error) {
+	return nil, fmt.Errof("unimplemented")
+}

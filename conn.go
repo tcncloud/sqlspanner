@@ -72,11 +72,13 @@ func (c *conn) Exec(query string, args []driver.Value) (driver.Result, error) {
 	}
 
 	switch pstmt.(type) {
-	case *sqlparser.Insert:
+	case stmt := *sqlparser.Insert:
 		logrus.Debug("is an insert query")
-		return c.executeInsertQuery(pstmt.(*sqlparser.Insert), args)
+		return c.executeInsertQuery(stmt, args)
 	case *sqlparser.Update:
 	case *sqlparser.Delete:
+		logrus.Debug("is a delete query")
+		return c.executeDeleteQuery(stmt, args)
 	default:
 	}
 
@@ -114,5 +116,29 @@ func (c *conn) executeInsertQuery(insert *sqlparser.Insert, args []driver.Value)
 		lastID: nil,
 		rowsAffected: &rowsAffected,
 	}, nil
+}
+
+func (c *conn) executeDeleteQuery(del *sqlparser.Delete, args []driver.Value) (driver.Result, error) {
+	logrus.WithFiled("stmt", del).Debug("delete statment")
+	tableName, err := extractIUDTableName(del)
+	if err != nil {
+		return nil, err
+	}
+	logrus.WithField("tableName", tableName).Debug("table name")
+	key, err := extractSpannerKeyFromDelete(del)
+	if err != nil {
+		return nil, err
+	}
+	muts := make([]*spanner.Mutation, 1)
+	muts[0] = spanner.Delete(tableName, key)
+	_, err = c.client.Apply(context.Background(), muts)
+	if err != nil {
+		return nil, err
+	}
+	rowsAffected := int64(1)
+	return &result{
+		lastId: nil,
+		rowsAffected: &rowsAffected,
+	}
 }
 
