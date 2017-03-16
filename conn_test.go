@@ -23,7 +23,7 @@ var _ = Describe("Conn", func() {
 			Expect(err).To(BeNil())
 		})
 		It("should be able to execute a delete statment", func() {
-			_, err := conn.Exec("DELETE FROM test_table WHERE id=1")
+			_, err := conn.Exec("DELETE FROM test_table WHERE id=1 AND simple_string=?", "test_string")
 			Expect(err).To(BeNil())
 		})
 	})
