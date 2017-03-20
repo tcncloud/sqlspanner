@@ -185,3 +185,15 @@ func getSpannerKeySetFromBoolExpr(boolExpr sqlparser.BoolExpr) (*spanner.KeySet,
 	}
 	return nil, fmt.Errorf("not a boolexpr")
 }
+
+func mergeKeySets(k1, k2 *spanner.Keyset) *spanner.Keyset {
+	if k1 == nil {
+		return k2
+	} else if k2 == nil {
+		return k1
+	}
+  k1.Keys = append(k1.Keys, k2.Keys...)
+	k1.Ranges = append(k1.Ranges, k2.Ranges...)
+
+	return k1
+}
