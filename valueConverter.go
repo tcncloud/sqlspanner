@@ -1,13 +1,13 @@
 package sqlspanner
 
 import (
-	"fmt"
-	"time"
-	"database/sql/driver"
-	"errors"
-	v1 "google.golang.org/genproto/googleapis/spanner/v1"
 	"cloud.google.com/go/civil"
 	"cloud.google.com/go/spanner"
+	"database/sql/driver"
+	"errors"
+	"fmt"
+	v1 "google.golang.org/genproto/googleapis/spanner/v1"
+	"time"
 )
 
 type valueConverter struct{}
@@ -54,17 +54,18 @@ func (v valueConverter) ConvertGenericCol(g *spanner.GenericColumnValue) (driver
 		var val []byte
 		g.Decode(&val)
 		return val, nil
-	case v1.TypeCode_ARRAY:// [](basic type)  or []struct
+	case v1.TypeCode_ARRAY: // [](basic type)  or []struct
 		if g.Type.ArrayElementType == nil {
 			return nil, fmt.Errorf("Recieved array TypeCode with nil ArrayElementType")
 		}
 		return convertArrayType(g, g.Type.ArrayElementType)
-	case v1.TypeCode_STRUCT:// unsupported
+	case v1.TypeCode_STRUCT: // unsupported
 		return nil, errors.New(UnimplementedError)
 	default:
 	}
 	return nil, nil
 }
+
 // recursively calls itself  till there is no more array type given
 // it is recursive, because it is possible to have an array of array of arrays etc.
 func convertArrayType(g *spanner.GenericColumnValue, arrType *v1.Type) (driver.Value, error) {
@@ -100,7 +101,7 @@ func convertArrayType(g *spanner.GenericColumnValue, arrType *v1.Type) (driver.V
 		var val []spanner.NullDate
 		g.Decode(&val)
 		return val, nil
-	case v1.TypeCode_STRUCT://spanner.NullRow?
+	case v1.TypeCode_STRUCT: //spanner.NullRow?
 		_ = g.Value.GetListValue().GetValues()[0].GetStructValue().GetFields()
 		// create []reflect.StructField from map["string"]*ptypes.Value
 		return nil, errors.New(UnimplementedError)
@@ -108,4 +109,3 @@ func convertArrayType(g *spanner.GenericColumnValue, arrType *v1.Type) (driver.V
 		return nil, fmt.Errorf("not able to decoded type")
 	}
 }
-
