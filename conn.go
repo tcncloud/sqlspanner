@@ -113,7 +113,7 @@ func (c *conn) executeInsertQuery(insert *sqlparser.Insert, args []driver.Value)
 	//TODO:  find the last inserted id, and put it on the result
 	rowsAffected := int64(1)
 	return &result{
-		lastID: nil,
+		lastID:       nil,
 		rowsAffected: &rowsAffected,
 	}, nil
 }
@@ -125,7 +125,7 @@ func (c *conn) executeDeleteQuery(del *sqlparser.Delete, args []driver.Value) (d
 		return nil, err
 	}
 	logrus.WithField("tableName", tableName).Debug("table name")
-	keyset, err := extractSpannerKeyFromDelete(del)
+	keyset, err := extractSpannerKeyFromDelete(del, args)
 	if err != nil {
 		return nil, err
 	}
@@ -134,7 +134,13 @@ func (c *conn) executeDeleteQuery(del *sqlparser.Delete, args []driver.Value) (d
 	for _, key := range keyset.Keys {
 		muts = append(muts, spanner.Delete(tableName, key))
 	}
-	for _, keyRange := range keyset.Ranges {
+	for i, keyRange := range keyset.Ranges {
+		logrus.WithFields(logrus.Fields{
+			"i":     i,
+			"Start": keyRange.Start,
+			"End":   keyRange.End,
+			"Kind":  keyRange.Kind,
+		}).Debug("KEYRANGE")
 		muts = append(muts, spanner.DeleteKeyRange(tableName, keyRange))
 	}
 	_, err = c.client.Apply(context.Background(), muts)
@@ -143,8 +149,7 @@ func (c *conn) executeDeleteQuery(del *sqlparser.Delete, args []driver.Value) (d
 	}
 	rowsAffected := int64(1)
 	return &result{
-		lastID: nil,
+		lastID:       nil,
 		rowsAffected: &rowsAffected,
 	}, nil
 }
-
