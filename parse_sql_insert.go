@@ -1,12 +1,11 @@
 package sqlspanner
 
-import(
-	"fmt"
-	"strconv"
-	"database/sql/driver"
-	"github.com/xwb1989/sqlparser"
-	"github.com/Sirupsen/logrus"
+import (
 	"cloud.google.com/go/spanner"
+	"database/sql/driver"
+	"fmt"
+	"github.com/Sirupsen/logrus"
+	"github.com/xwb1989/sqlparser"
 )
 
 //  extracts the column names used in an insert query.  Does not support:
@@ -21,13 +20,13 @@ func extractInsertColumns(insert *sqlparser.Insert) ([]string, error) {
 		case *sqlparser.StarExpr:
 			logrus.WithFields(logrus.Fields{
 				"Star:": t,
-				"i:": i,
+				"i:":    i,
 			}).Debug("star expr")
 			return nil, fmt.Errorf("cannot use type: sqlparser.StarExpr in insert query")
 		case *sqlparser.NonStarExpr:
 			logrus.WithFields(logrus.Fields{
 				"NonStar:": t,
-				"i:": i,
+				"i:":       i,
 			}).Debug("nonstar expr")
 			e, ok := t.Expr.(*sqlparser.ColName)
 			if !ok {
@@ -84,6 +83,7 @@ func extractIUDTableName(st sqlparser.Statement) (string, error) {
 // - tuples
 // - Binary, Unary, Function, or Case expressions
 func extractInsertValues(insert *sqlparser.Insert, args []driver.Value) ([]interface{}, error) {
+	myArgs := &Args{Values: args}
 	rows := insert.Rows
 	switch rowType := rows.(type) {
 	case *sqlparser.Select, *sqlparser.Union:
@@ -97,55 +97,19 @@ func extractInsertValues(insert *sqlparser.Insert, args []driver.Value) ([]inter
 		switch valType := rt.(type) {
 		case *sqlparser.Subquery:
 			return nil, fmt.Errorf("insert queries cannot have subqueries")
-		case sqlparser.ValTuple:// a number
+		case sqlparser.ValTuple: // a number
 			fmt.Printf("is ValTuple %+v\n", valType)
 
 			valExp := sqlparser.ValExprs(valType)
 			valExps := ([]sqlparser.ValExpr)(valExp)
 			rowValues := make([]interface{}, len(valExps))
 
-			curArg := 0
-
 			for i, ve := range valExps {
-				switch value := ve.(type) {
-				case sqlparser.StrVal:// a quoted string
-					rowValues[i] = string(value[:])
-				case sqlparser.NumVal:
-					rv, err := strconv.ParseInt(string(value[:]), 10, 64)
-					if err != nil {
-						rv, err := strconv.ParseFloat(string(value[:]), 64)
-						if err != nil {
-							return nil, fmt.Errorf("could not parse number value as int or float")
-						}
-						rowValues[i] = rv
-					} else {
-						rowValues[i] = rv
-					}
-				case sqlparser.ValArg:// a ?
-					if curArg >= len(args) {
-						return nil, fmt.Errorf("not enough arguments suplied to match query")
-					}
-					rowValues[i] = args[curArg]
-					curArg++
-				case *sqlparser.NullVal:
-					rowValues[i] = nil
-				case *sqlparser.ColName:
-					fmt.Printf("ColName %+v\n",ve)
-				case sqlparser.ValTuple:
-					fmt.Printf("ValTuple %+v\n",ve)
-				case *sqlparser.Subquery:
-					fmt.Printf("Subquery %+v\n",ve)
-				case sqlparser.ListArg:
-					fmt.Printf("ListArg %+v\n",ve)
-				case *sqlparser.BinaryExpr:
-					fmt.Printf("BinaryExpr %+v\n",ve)
-				case *sqlparser.UnaryExpr:
-					fmt.Printf("UnaryExpr %+v\n",ve)
-				case *sqlparser.FuncExpr:
-					fmt.Printf("FuncExpr %+v\n",ve)
-				case *sqlparser.CaseExpr:
-					fmt.Printf("CaseExpr %+v\n",ve)
+				rowVal, err := myArgs.ParseValExpr(ve)
+				if err != nil {
+					return nil, err
 				}
+				rowValues[i] = rowVal
 			}
 			return rowValues, nil
 		}
@@ -153,47 +117,3 @@ func extractInsertValues(insert *sqlparser.Insert, args []driver.Value) ([]inter
 	return nil, fmt.Errorf("insert query not compatable with spanner insert")
 }
 
-func extractSpannerKeyFromDelete(del *sqlparser.Delete) (*spanner.KeySet, error) {
-	where := del.Where
-	if where == nil {
-		return nil, fmt.Errorf("Must include a where clause that contain primary keys in delete statement")
-	}
-	fmt.Printf("where type: %+v\n", where.Type)
-	keyset, err := getSpannerKeySetFromBoolExpr(where.Expr)
-	if err != nil {
-		return nil, err
-	}
-	return keyset, fmt.Errorf("unimplemented")
-}
-
-func getSpannerKeySetFromBoolExpr(boolExpr sqlparser.BoolExpr) (*spanner.KeySet, error) {
-	switch expr := boolExpr.(type) {
-	case *sqlparser.AndExpr:
-		fmt.Printf("AndExpr %#v\n", expr)
-	case *sqlparser.OrExpr:
-		fmt.Printf("OrExpr %#v\n", expr)
-	case *sqlparser.ParenBoolExpr:
-		fmt.Printf("ParenBoolExpr %#v\n", expr)
-	case *sqlparser.ComparisonExpr:
-		fmt.Printf("ComparisonExpr %#v\n", expr)
-	case *sqlparser.RangeCond:
-		fmt.Printf("RangeCond %#v\n", expr)
-	case *sqlparser.NullCheck:
-		fmt.Printf("NullCheck %#v\n", expr)
-	case *sqlparser.ExistsExpr:
-		fmt.Printf("ExistsExpr %#v\n", expr)
-	}
-	return nil, fmt.Errorf("not a boolexpr")
-}
-
-func mergeKeySets(k1, k2 *spanner.Keyset) *spanner.Keyset {
-	if k1 == nil {
-		return k2
-	} else if k2 == nil {
-		return k1
-	}
-  k1.Keys = append(k1.Keys, k2.Keys...)
-	k1.Ranges = append(k1.Ranges, k2.Ranges...)
-
-	return k1
-}
