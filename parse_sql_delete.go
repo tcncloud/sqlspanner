@@ -4,7 +4,6 @@ import (
 	"cloud.google.com/go/spanner"
 	"database/sql/driver"
 	"fmt"
-	"github.com/Sirupsen/logrus"
 	"github.com/xwb1989/sqlparser"
 )
 

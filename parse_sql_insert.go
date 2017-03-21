@@ -1,7 +1,6 @@
 package sqlspanner
 
 import (
-	"cloud.google.com/go/spanner"
 	"database/sql/driver"
 	"fmt"
 	"github.com/Sirupsen/logrus"
