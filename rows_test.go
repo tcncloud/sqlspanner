@@ -11,6 +11,7 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
+
 func init() {
 	logrus.SetLevel(logrus.DebugLevel)
 }
@@ -51,7 +52,7 @@ var _ = Describe("Rows", func() {
 					})
 
 					It("gets correct []driver.Value for number of rows that are in iterator", func() {
-						for i:= 0; i < 2; i++ {
+						for i := 0; i < 2; i++ {
 							row := make([]driver.Value, 10)
 							err := rows.Next(row)
 							Expect(err).To(BeZero())
@@ -68,7 +69,7 @@ var _ = Describe("Rows", func() {
 					next := sqlspanner.NewTestNextable(2, "times")
 					rows := sqlspanner.NewRowsFromNextable(next)
 					It("gets correct []driver.Value for number of rows that are in iterator", func() {
-						for i:= 0; i < 2; i++ {
+						for i := 0; i < 2; i++ {
 							row := make([]driver.Value, 4)
 							err := rows.Next(row)
 							Expect(err).To(BeZero())
@@ -118,4 +119,3 @@ var _ = Describe("Rows", func() {
 
 	})
 })
-

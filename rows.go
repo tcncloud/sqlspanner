@@ -23,7 +23,7 @@ func newRowsFromNextable(iter nextable) *rows {
 	r := &rows{
 		iter:   iter,
 		valuer: valueConverter{},
-		row: nil,
+		row:    nil,
 	}
 
 	if r.iter == nil {
@@ -43,10 +43,10 @@ func newRowsFromSpannerRow(row *spanner.Row) *rows {
 		return newRowsFromNextable(nil)
 	}
 	return &rows{
-		iter: nil,
+		iter:   nil,
 		valuer: valueConverter{},
-		row: row,
-		cols: row.ColumnNames(),
+		row:    row,
+		cols:   row.ColumnNames(),
 	}
 }
 
@@ -134,10 +134,9 @@ func (r *rows) NextResultSet() error {
 	return nil
 }
 
-
 // So I don't have to be given a spanner.RowIterator,  I could be given anything
 // that returns a spanner.Row, and an error
-type nextable interface{
+type nextable interface {
 	Next() (*spanner.Row, error)
 	Stop()
 }
