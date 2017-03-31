@@ -23,8 +23,10 @@ func (a *Args) Next() (interface{}, error) {
 func (a *Args) ParseValExpr(expr sqlparser.ValExpr) (interface{}, error) {
 	switch value := expr.(type) {
 	case sqlparser.StrVal: // a quoted string
+		fmt.Printf("StrVal %+v\n", value)
 		return string(value[:]), nil
 	case sqlparser.NumVal:
+		fmt.Printf("NumVal %+v\n", value)
 		rv, err := strconv.ParseInt(string(value[:]), 10, 64)
 		if err != nil {
 			rv, err := strconv.ParseFloat(string(value[:]), 64)
@@ -36,6 +38,7 @@ func (a *Args) ParseValExpr(expr sqlparser.ValExpr) (interface{}, error) {
 			return rv, nil
 		}
 	case sqlparser.ValArg: // a ?
+		fmt.Printf("ValArg %+v\n", value)
 		arg, err := a.Next()
 		if err != nil {
 			return nil, fmt.Errorf("not enough arguments suplied to match query")
