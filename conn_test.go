@@ -38,10 +38,18 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
+// Spanner costs money. So this database needs to be recreated every time we do testing
+// these var says we have a project setup of:
+// projectID: algebraic-ratio-149721
+// instanceID: test-instance
+// database: test-project
+// table:  test_table1, Columns: (id (int64), simple_string (string)), Primary Key: id
+var spannerTestDatabase = "projects/algebraic-ratio-149721/instances/test-instance/databases/test-project"
 
+// TODO when selects get working,  actually test that the data gets inserted/updated/deleted
 var _ = Describe("Conn", func() {
 	Describe("given a db connection ", func() {
-		conn, err := sql.Open("spanner", "projects/algebraic-ratio-149721/instances/test-instance/databases/test-project")
+		conn, err := sql.Open("spanner", spannerTestDatabase)
 		It("should connect succesfuly", func() {
 			Expect(err).To(BeNil())
 		})
@@ -54,6 +62,7 @@ var _ = Describe("Conn", func() {
 		})
 		It("should be able to execute an update statement", func() {
 			_, err = conn.Exec(`UPDATE test_table1 SET simple_string=? WHERE id=1`, "changed test string")
+			Expect(err).To(BeNil())
 		})
 		It("should be able to execute a delete statement", func() {
 			_, err = conn.Exec("DELETE FROM test_table1 WHERE id = 1 ", nil)
