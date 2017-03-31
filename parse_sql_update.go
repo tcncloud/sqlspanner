@@ -11,6 +11,18 @@ type updateMap struct {
 	myArgs *Args
 }
 
+// Spanner updates a particular row by being able to find the row by the primary key.
+// Because of this,  updates on primary key fields are not supported.
+// A valid sql update query for spanner currently means  listing the the values to to update
+// Using SET clauses,  and the a WHERE  clause that specifies the primary key. Multi-column primary
+// keys should be joined with AND expressions  in the Where clause.
+// Example:
+// 	db.Exec("UPDATE test_table1 SET simple_string="hello_world" WHERE id=1")
+// Would reference a spanner table with two fields, (id, simple_string)
+// with "id" being the primary key
+// 	db.Exec("UPDATE test_table2 SET simple_string="hello_world" WHERE id=1 AND other_id=2")
+// would reference a spanner table with 3 fields: (id, other_id, simple_string)
+// with "id" and "other_id"  being the primary keys
 func extractUpdateClause(update *sqlparser.Update, args []driver.Value) (map[string]interface{}, error) {
 	myArgs := &Args{Values: args}
 	updatedVals := make(map[string]interface{})
@@ -37,8 +49,6 @@ func extractUpdateClause(update *sqlparser.Update, args []driver.Value) (map[str
 	if err != nil {
 		return nil, err
 	}
-	// the changed values of the row are now in the map,  now we need to add the
-	// primary key from the where clause.
 	return upMap.updatedVals, nil
 }
 
