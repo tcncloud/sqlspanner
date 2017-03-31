@@ -76,6 +76,7 @@ func (c *conn) Exec(query string, args []driver.Value) (driver.Result, error) {
 		logrus.Debug("is an insert query")
 		return c.executeInsertQuery(stmt, args)
 	case *sqlparser.Update:
+		return c.executeUpdateQuery(stmt, args)
 	case *sqlparser.Delete:
 		logrus.Debug("is a delete query")
 		return c.executeDeleteQuery(stmt, args)
@@ -153,3 +154,31 @@ func (c *conn) executeDeleteQuery(del *sqlparser.Delete, args []driver.Value) (d
 		rowsAffected: &rowsAffected,
 	}, nil
 }
+
+func (c *conn) executeUpdateQuery(up *sqlparser.Update, args []driver.Value) (driver.Result, error) {
+	logrus.WithField("stmt", up).Debug("update statement")
+	tableName, err := extractIUDTableName(up)
+	if err != nil {
+		return nil, err
+	}
+	logrus.WithField("tableName", tableName).Debug("table name")
+
+	upMap, err := extractUpdateClause(up, args)
+	if err != nil {
+		return nil, err
+	}
+
+	muts := make([]*spanner.Mutation, 1)
+	muts[0] = spanner.UpdateMap(tableName, upMap)
+	_, err = c.client.Apply(context.Background(), muts)
+	if err != nil {
+		return nil, err
+	}
+
+	rowsAffected := int64(1)
+	return &result{
+		lastID:       nil,
+		rowsAffected: &rowsAffected,
+	}, nil
+}
+
