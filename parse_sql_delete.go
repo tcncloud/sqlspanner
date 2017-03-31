@@ -36,11 +36,11 @@ func extractSpannerKeyFromDelete(del *sqlparser.Delete, args []driver.Value) (*s
 		Keys:     make(map[string]*Key),
 		KeyOrder: make([]string, 0),
 	}
-	err := aKeySet.WalkBoolExpr(where.Expr)
+	err := aKeySet.walkBoolExpr(where.Expr)
 	if err != nil {
 		return nil, err
 	}
-	return aKeySet.PackageKeySet()
+	return aKeySet.packageKeySet()
 }
 
 type Key struct {
@@ -71,7 +71,7 @@ type MergableKeyRange struct {
 // all lower bounds are turned into a key together.
 // all upper bounds are turned into a key together.
 // it is expected that all fields in a query belong together
-func (a *AwareKeySet) PackageKeySet() (*spanner.KeySet, error) {
+func (a *AwareKeySet) packageKeySet() (*spanner.KeySet, error) {
 	var prev *MergableKeyRange
 	//makes sure all we dont have holes in our key ranges,  that is undefined behaviour
 	for i := len(a.KeyOrder) - 1; i > 0; i-- { // dont check before the first elem
@@ -91,13 +91,13 @@ func (a *AwareKeySet) PackageKeySet() (*spanner.KeySet, error) {
 	for _, k := range a.KeyOrder {
 		key := a.Keys[k]
 		m := &MergableKeyRange{}
-		m.FromKey(key)
+		m.fromKey(key)
 		if prev == nil {
 			prev = m
 		} else {
 			fmt.Printf("key that will populate m: %#v\n\n", key)
 			fmt.Printf("populated m: %#v\n\n", m)
-			err := prev.MergeKeyRange(m)
+			err := prev.mergeKeyRange(m)
 			fmt.Printf("merged prev with m %#v\n\n", prev)
 			if err != nil {
 				return nil, err
@@ -108,7 +108,7 @@ func (a *AwareKeySet) PackageKeySet() (*spanner.KeySet, error) {
 	return prev.ToKeySet(), nil
 }
 
-func (k1 *MergableKeyRange) FromKey(key *Key) {
+func (k1 *MergableKeyRange) fromKey(key *Key) {
 	if key == nil {
 		return
 	}
@@ -144,7 +144,7 @@ func (k *MergableKeyRange) ToKeySet() *spanner.KeySet {
 	return keySet
 }
 
-func (k1 *MergableKeyRange) MergeKeyRange(k2 *MergableKeyRange) error {
+func (k1 *MergableKeyRange) mergeKeyRange(k2 *MergableKeyRange) error {
 	fmt.Printf("\nmerging into k1: %#v\n  k2: %#v\n\n", k1, k2)
 	if k1 == nil && k2 != nil {
 		*k1 = *k2
@@ -167,7 +167,7 @@ func (k1 *MergableKeyRange) MergeKeyRange(k2 *MergableKeyRange) error {
 	return nil
 }
 
-func (a *AwareKeySet) AddKeyFromValExpr(valExpr sqlparser.ValExpr) (*Key, error) {
+func (a *AwareKeySet) addKeyFromValExpr(valExpr sqlparser.ValExpr) (*Key, error) {
 	col, ok := valExpr.(*sqlparser.ColName)
 	if !ok {
 		return nil, fmt.Errorf("not a valid column name")
@@ -183,15 +183,15 @@ func (a *AwareKeySet) AddKeyFromValExpr(valExpr sqlparser.ValExpr) (*Key, error)
 	return a.Keys[keyName], nil
 }
 
-func (a *AwareKeySet) WalkBoolExpr(boolExpr sqlparser.BoolExpr) error {
+func (a *AwareKeySet) walkBoolExpr(boolExpr sqlparser.BoolExpr) error {
 	switch expr := boolExpr.(type) {
 	case *sqlparser.AndExpr:
 		fmt.Printf("AndExpr %#v\n", expr)
-		err := a.WalkBoolExpr(expr.Left)
+		err := a.walkBoolExpr(expr.Left)
 		if err != nil {
 			return err
 		}
-		err = a.WalkBoolExpr(expr.Right)
+		err = a.walkBoolExpr(expr.Right)
 		if err != nil {
 			return err
 		}
@@ -203,7 +203,7 @@ func (a *AwareKeySet) WalkBoolExpr(boolExpr sqlparser.BoolExpr) error {
 		fmt.Printf("ParenBoolExpr %#v\n", expr)
 	case *sqlparser.ComparisonExpr:
 		fmt.Printf("ComparisonExpr %#v\n", expr)
-		myKey, err := a.AddKeyFromValExpr(expr.Left)
+		myKey, err := a.addKeyFromValExpr(expr.Left)
 		if err != nil {
 			return err
 		}
@@ -250,7 +250,7 @@ func (a *AwareKeySet) WalkBoolExpr(boolExpr sqlparser.BoolExpr) error {
 		}
 	case *sqlparser.RangeCond:
 		fmt.Printf("RangeCond %#v\n", expr)
-		myKey, err := a.AddKeyFromValExpr(expr.Left)
+		myKey, err := a.addKeyFromValExpr(expr.Left)
 		if err != nil {
 			return err
 		}
