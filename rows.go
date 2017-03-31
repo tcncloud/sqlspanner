@@ -86,8 +86,7 @@ func (r *rows) iterate() {
 		r.err = io.EOF
 	}
 	if r.err == nil {
-		//get the first row result now, so we can get the column names
-		// r.row only will exist if r.done is false
+		// get the first row result now, so we can get the column names
 		row, err := r.iter.Next()
 		if err == iterator.Done {
 			r.err = io.EOF
@@ -103,7 +102,7 @@ func (r *rows) iterate() {
 func (r *rows) handleRow(dest []driver.Value) {
 	row := r.row
 	r.row = nil
-	//set up generic pointers to pull of each row
+	//set up generic pointers to pull off each row
 	pointers := make([]*spanner.GenericColumnValue, row.Size())
 	for i := 0; i < row.Size(); i++ {
 		pointers[i] = new(spanner.GenericColumnValue)
