@@ -31,6 +31,8 @@
 package sqlspanner
 
 import (
+	"fmt"
+	"strings"
 	"context"
 	"database/sql/driver"
 	"errors"
@@ -88,6 +90,43 @@ func (c *conn) Ping(ctx context.Context) error {
 		return driver.ErrBadConn
 	}
 	return nil
+}
+
+// creates a spanner statement out of the given query string and and array of driver values
+// a spanner statment requires a Query with @ prefixed named args, instead of sql drivers ?
+// and for params it requires a map[string]interface{} intead of []driver.Value
+// Takes a query like: SELECT * FROM example_table WHERE a=?  OR b=? OR c=5
+// and turns it into: SELECT * FROM example_table WHERE a=@1 OR b=@2 OR c=5
+func (c *conn) Query(query string, args []driver.Value) (driver.Rows, error) {
+	var stmt spanner.Statement
+	if len(args) == 0 {
+		stmt = spanner.NewStatement(query)
+	} else {
+		spl := strings.Split(query, "?")
+		params := make(map[string]interface{})
+
+		if len(spl) != len(args) {
+			return nil, fmt.Errorf("number of ? in a query must match number of args provided")
+		}
+		updatedQuery := ""
+
+		for i := 0; i < len(spl) - 1; i++ {
+			namedIndex := fmt.Sprintf("@%d", i)
+			updatedQuery += (spl[i] + namedIndex)
+			params[namedIndex] = args[i]
+		}
+		updatedQuery += spl[len(spl) - 1]
+
+		stmt = spanner.Statement{
+			SQL: updatedQuery,
+			Params: params,
+		}
+	}
+	logrus.WithField("query", stmt.SQL).Debug("the query statement")
+	logrus.WithField("params", stmt.Params).Debug("the params")
+	iter := c.client.Single().Query(context.Background(), stmt)
+
+	return newRowsFromSpannerIterator(iter), nil
 }
 
 func (c *conn) Exec(query string, args []driver.Value) (driver.Result, error) {
