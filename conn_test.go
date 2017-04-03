@@ -43,7 +43,13 @@ import (
 // projectID: algebraic-ratio-149721
 // instanceID: test-instance
 // database: test-project
-// table:  test_table1, Columns: (id (int64), simple_string (string)), Primary Key: id
+// table:  test_table1,
+// Columns: (id (int64), simple_string (string)),
+// Primary Key: id
+//
+// table: test_table2,
+// Columns: (id (int64), id_string (string), simple_string(string), items (array<string>)
+// Primary Key: id, id_string
 var spannerTestDatabase = "projects/algebraic-ratio-149721/instances/test-instance/databases/test-project"
 
 // TODO when selects get working,  actually test that the data gets inserted/updated/deleted
@@ -58,6 +64,23 @@ var _ = Describe("Conn", func() {
 		})
 		It("should be able to execute an insert statement", func() {
 			_, err := conn.Exec("INSERT INTO test_table1(id, simple_string) VALUES(?, ?)", 1, "test_string")
+			Expect(err).To(BeNil())
+		})
+		It("should be able to execute a select statement", func() {
+			rows, err := conn.Query("SELECT * FROM test_table1")
+			Expect(err).To(BeNil())
+			Expect(rows.Columns()).To(BeEquivalentTo([]string{"id", "simple_string"}))
+			hasNext := rows.Next()
+			Expect(hasNext).To(Equal(true))
+			Expect(rows.Err()).To(BeNil())
+			var id int64
+			var s string
+			rows.Scan(&id, &s)
+			Expect(id).To(Equal(int64(1)))
+			Expect(s).To(Equal("test_string"))
+			hasNext = rows.Next()
+			Expect(hasNext).To(Equal(false))
+			err = rows.Close()
 			Expect(err).To(BeNil())
 		})
 		It("should be able to execute an update statement", func() {
