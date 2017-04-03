@@ -126,6 +126,7 @@ func (r *rows) handleRow(dest []driver.Value) {
 	}
 }
 
+// will return an io.EOF when iteration is done
 func (r *rows) Next(dest []driver.Value) error {
 	switch {
 	case r.row != nil: // first row gotten by an interator will be handled this way
