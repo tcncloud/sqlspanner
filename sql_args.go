@@ -38,11 +38,16 @@ import (
 	"github.com/xwb1989/sqlparser"
 )
 
+
 type Args struct {
 	Values []driver.Value
 	Cur    int
+	Counter int
 }
 
+type ArgPlaceholder struct {
+	queuePos int
+}
 func (a *Args) Next() (interface{}, error) {
 	if a.Cur >= len(a.Values) {
 		return nil, fmt.Errorf("out of range")
@@ -69,12 +74,16 @@ func (a *Args) ParseValExpr(expr sqlparser.ValExpr) (interface{}, error) {
 			return rv, nil
 		}
 	case sqlparser.ValArg: // a ?
-		fmt.Printf("ValArg %+v\n", value)
-		arg, err := a.Next()
-		if err != nil {
-			return nil, fmt.Errorf("not enough arguments suplied to match query")
-		}
-		return arg, nil
+		//fmt.Printf("ValArg %+v\n", value)
+		//arg, err := a.Next()
+		//if err != nil {
+		//	return nil, fmt.Errorf("not enough arguments suplied to match query")
+		//}
+		//return arg, nil
+		//return nil, ProvidedValue
+		val := ArgPlaceholder{queuePos: a.Counter}
+		a.Counter += 1
+		return val, nil
 	case *sqlparser.NullVal:
 		return nil, nil
 	case *sqlparser.ColName:
@@ -96,3 +105,70 @@ func (a *Args) ParseValExpr(expr sqlparser.ValExpr) (interface{}, error) {
 	}
 	return nil, fmt.Errorf("unsupported value expression")
 }
+
+type partialArgSlice struct {
+	args []interface{}
+	unfilled map[int]ArgPlaceholder
+	expectedArgs int
+}
+
+type partialArgMap struct {
+	args map[string]interface{}
+	unfilled map[string]ArgPlaceholder
+	expectedArgs int
+}
+
+func newPartialArgSlice() *partialArgSlice {
+	return &partialArgSlice{
+		args: make([]interface{}, 0),
+		unfilled: make(map[int]ArgPlaceholder),
+	}
+}
+
+func newPartialArgMap() *partialArgMap {
+	return &partialArgMap{
+		args: make(map[string]interface{}),
+		unfilled: make(map[string]ArgPlaceholder),
+	}
+}
+
+func (p *partialArgSlice) AddArgs(args ...interface{}) {
+	for _, arg := range args {
+		p.args = append(p.args, arg)
+		if ap, ok := arg.(ArgPlaceholder); ok {
+			p.unfilled[len(p.args) - 1] = ap
+			p.expectedArgs += 1
+		}
+	}
+}
+
+func (p *partialArgSlice) GetFilledArgs(a []driver.Value) ([]interface{}, error) {
+	if len(a) < p.expectedArgs {
+		return nil, fmt.Errorf("expected at least %i args", p.expectedArgs)
+	}
+	argsCopy := p.args[:]
+	for index, ap := range p.unfilled {
+		argsCopy[index] = a[ap.queuePos]
+	}
+	return argsCopy, nil
+}
+
+func (p *partialArgMap) AddArg(key string, val interface{}) {
+	p.args[key] = val
+	if ap, ok := val.(ArgPlaceholder); ok {
+		p.expectedArgs += 1
+		p.unfilled[key] = ap
+	}
+}
+
+func (p *partialArgMap) GetFilledArgs(a []driver.Value) (map[string]interface{}, error) {
+	if len(a) < p.expectedArgs {
+		return nil, fmt.Errorf("expected at least %i args", p.expectedArgs)
+	}
+	// this is modifiying the map directly, but should be okay because of the error above
+	for key, ap := range p.unfilled {
+		p.args[key] = a[ap.queuePos]
+	}
+	return p.args, nil
+}
+
