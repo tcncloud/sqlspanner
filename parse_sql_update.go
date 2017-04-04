@@ -31,13 +31,12 @@
 package sqlspanner
 
 import (
-	"database/sql/driver"
 	"fmt"
 	"github.com/xwb1989/sqlparser"
 )
 
 type updateMap struct {
-	updatedVals map[string]interface{}
+	updatedVals *partialArgMap
 	myArgs *Args
 }
 
@@ -53,9 +52,9 @@ type updateMap struct {
 // 	db.Exec("UPDATE test_table2 SET simple_string="hello_world" WHERE id=1 AND other_id=2")
 // would reference a spanner table with 3 fields: (id, other_id, simple_string)
 // with "id" and "other_id"  being the primary keys
-func extractUpdateClause(update *sqlparser.Update, args []driver.Value) (map[string]interface{}, error) {
-	myArgs := &Args{Values: args}
-	updatedVals := make(map[string]interface{})
+func extractUpdateClause(update *sqlparser.Update) (*partialArgMap, error) {
+	myArgs := &Args{}
+	updatedVals := newPartialArgMap()
 	updateExprs := ([]*sqlparser.UpdateExpr)(update.Exprs)
 	for _, updateExpr := range updateExprs {
 		if updateExpr.Name == nil {
@@ -72,7 +71,7 @@ func extractUpdateClause(update *sqlparser.Update, args []driver.Value) (map[str
 		if err != nil {
 			return nil, err
 		}
-		updatedVals[name] = arg
+		updatedVals.AddArg(name, arg)
 	}
 	upMap := updateMap{updatedVals: updatedVals, myArgs: myArgs}
 	err := upMap.walkBoolExpr(update.Where.Expr)
@@ -106,7 +105,7 @@ func (u *updateMap) walkBoolExpr(boolExpr sqlparser.BoolExpr) error {
 			return err
 		}
 		//passed all the tests,  put the value in the map
-		u.updatedVals[name] = val
+		u.updatedVals.AddArg(name, val)
 	case *sqlparser.NullCheck:
 		name, err := u.validColNameFromValExpr(expr.Expr)
 		if err != nil {
@@ -115,7 +114,7 @@ func (u *updateMap) walkBoolExpr(boolExpr sqlparser.BoolExpr) error {
 		if expr.Operator != "is null" {
 			return fmt.Errorf(`only "is null" checks are supported in update query's Where clause`)
 		}
-		u.updatedVals[name] = nil
+		u.updatedVals.AddArg(name, nil)
 	default:
 		return fmt.Errorf("Unsupported Boolexpr, only support AndExpr, NullCheck, or ComparisonExpr with =")
 	}
@@ -132,7 +131,7 @@ func (u *updateMap) validColNameFromValExpr(expr sqlparser.ValExpr) (string, err
 		return "", fmt.Errorf("qualifiers not supported in update queries")
 	}
 	name := string(col.Name[:])
-	if _, present := u.updatedVals[name]; present {
+	if _, present := u.updatedVals.args[name]; present {
 		return "", fmt.Errorf("update query's where clause cannot have a column that overrides a row being upated")
 	}
 	return name, nil

@@ -31,7 +31,6 @@
 package sqlspanner
 
 import (
-	"database/sql/driver"
 	"fmt"
 
 	"github.com/Sirupsen/logrus"
@@ -112,8 +111,8 @@ func extractIUDTableName(st sqlparser.Statement) (string, error) {
 // - referencing other columns
 // - tuples
 // - Binary, Unary, Function, or Case expressions
-func extractInsertValues(insert *sqlparser.Insert, args []driver.Value) ([]interface{}, error) {
-	myArgs := &Args{Values: args}
+func prepareInsertValues(insert *sqlparser.Insert) (*partialArgSlice, error) {
+	myArgs := &Args{}
 	rows := insert.Rows
 	switch rowType := rows.(type) {
 	case *sqlparser.Select, *sqlparser.Union:
@@ -132,16 +131,16 @@ func extractInsertValues(insert *sqlparser.Insert, args []driver.Value) ([]inter
 
 			valExp := sqlparser.ValExprs(valType)
 			valExps := ([]sqlparser.ValExpr)(valExp)
-			rowValues := make([]interface{}, len(valExps))
+			partialArgs := newPartialArgSlice()
 
-			for i, ve := range valExps {
+			for _, ve := range valExps {
 				rowVal, err := myArgs.ParseValExpr(ve)
 				if err != nil {
 					return nil, err
 				}
-				rowValues[i] = rowVal
+				partialArgs.AddArgs(rowVal)
 			}
-			return rowValues, nil
+			return partialArgs, nil
 		}
 	}
 	return nil, fmt.Errorf("insert query not compatable with spanner insert")

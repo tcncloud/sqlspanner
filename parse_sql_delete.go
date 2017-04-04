@@ -55,12 +55,12 @@ import (
 // - currently only one key range, per primary key is permitted.  Just use two queries. ex.
 //    not permitted: DELETE FROM test_table WHERE id > 1 AND id < 10 AND id > 20 AND id < 100
 // - Does not support cross table queries
-func extractSpannerKeyFromDelete(del *sqlparser.Delete, args []driver.Value) (*spanner.KeySet, error) {
+func extractSpannerKeyFromDelete(del *sqlparser.Delete) (*MergableKeyRange, error) {
 	where := del.Where
 	if where == nil {
 		return nil, fmt.Errorf("Must include a where clause that contain primary keys in delete statement")
 	}
-	myArgs := &Args{Values: args}
+	myArgs := &Args{}
 	fmt.Printf("where type: %+v\n", where.Type)
 	aKeySet := &AwareKeySet{
 		Args:     myArgs,
@@ -71,14 +71,14 @@ func extractSpannerKeyFromDelete(del *sqlparser.Delete, args []driver.Value) (*s
 	if err != nil {
 		return nil, err
 	}
-	return aKeySet.packageKeySet()
+	return aKeySet.packKeySet()
 }
 
 type Key struct {
 	Name       string
 	LowerValue interface{}
-	LowerOpen  bool
 	UpperValue interface{}
+	LowerOpen  bool
 	UpperOpen  bool
 	HaveLower  bool
 	HaveUpper  bool
@@ -91,8 +91,8 @@ type AwareKeySet struct {
 }
 
 type MergableKeyRange struct {
-	Start     []interface{}
-	End       []interface{}
+	Start     *partialArgSlice
+	End       *partialArgSlice
 	LowerOpen bool
 	UpperOpen bool
 	HaveLower bool
@@ -102,7 +102,7 @@ type MergableKeyRange struct {
 // all lower bounds are turned into a key together.
 // all upper bounds are turned into a key together.
 // it is expected that all fields in a query belong together
-func (a *AwareKeySet) packageKeySet() (*spanner.KeySet, error) {
+func (a *AwareKeySet) packKeySet() (*MergableKeyRange, error) {
 	var prev *MergableKeyRange
 	//makes sure all we dont have holes in our key ranges,  that is undefined behaviour
 	for i := len(a.KeyOrder) - 1; i > 0; i-- { // dont check before the first elem
@@ -121,14 +121,12 @@ func (a *AwareKeySet) packageKeySet() (*spanner.KeySet, error) {
 	}
 	for _, k := range a.KeyOrder {
 		key := a.Keys[k]
-		m := &MergableKeyRange{}
-		m.fromKey(key)
 		if prev == nil {
-			prev = m
+			prev = &MergableKeyRange{Start: newPartialArgSlice(), End: newPartialArgSlice()}
+			prev.fromKey(key)
 		} else {
-			fmt.Printf("key that will populate m: %#v\n\n", key)
-			fmt.Printf("populated m: %#v\n\n", m)
-			err := prev.mergeKeyRange(m)
+			fmt.Printf("key that will populate prev: %#v\n\n", key)
+			err := prev.mergeKey(key)
 			fmt.Printf("merged prev with m %#v\n\n", prev)
 			if err != nil {
 				return nil, err
@@ -136,7 +134,7 @@ func (a *AwareKeySet) packageKeySet() (*spanner.KeySet, error) {
 		}
 	}
 	fmt.Printf("prev: %#v\n\n", prev)
-	return prev.ToKeySet(), nil
+	return prev, nil
 }
 
 func (k1 *MergableKeyRange) fromKey(key *Key) {
@@ -147,12 +145,11 @@ func (k1 *MergableKeyRange) fromKey(key *Key) {
 	k1.UpperOpen = key.UpperOpen
 	k1.HaveLower = key.HaveLower
 	k1.HaveUpper = key.HaveUpper
-	k1.Start = []interface{}{key.LowerValue}
-	k1.End = []interface{}{key.UpperValue}
+	k1.Start.AddArgs(key.LowerValue)
+	k1.End.AddArgs(key.UpperValue)
 }
 
-func (k *MergableKeyRange) ToKeySet() *spanner.KeySet {
-	keySet := &spanner.KeySet{}
+func (k *MergableKeyRange) ToKeyRange(args []driver.Value) (*spanner.KeyRange, error) {
 	low := k.LowerOpen
 	up := k.UpperOpen
 
@@ -167,33 +164,34 @@ func (k *MergableKeyRange) ToKeySet() *spanner.KeySet {
 	} else {
 		kind = spanner.ClosedClosed
 	}
-	keySet.Ranges = append(keySet.Ranges, spanner.KeyRange{
-		Start: spanner.Key(k.Start),
-		End:   spanner.Key(k.End),
+	start, err := k.Start.GetFilledArgs(args)
+	if err != nil {
+		return nil, err
+	}
+	end, err := k.End.GetFilledArgs(args)
+	if err != nil {
+		return nil, err
+	}
+	return &spanner.KeyRange{
+		Start: start,
+		End:   end,
 		Kind:  kind,
-	})
-	return keySet
+	}, nil
 }
 
-func (k1 *MergableKeyRange) mergeKeyRange(k2 *MergableKeyRange) error {
+func (k1 *MergableKeyRange) mergeKey(k2 *Key) error {
 	fmt.Printf("\nmerging into k1: %#v\n  k2: %#v\n\n", k1, k2)
-	if k1 == nil && k2 != nil {
-		*k1 = *k2
-		return nil
-	} else if k2 == nil {
-		return nil
-	}
 	if k2.HaveLower {
 		if k1.LowerOpen != k2.LowerOpen {
 			return fmt.Errorf("Kinds in ranges must all match")
 		}
-		k1.Start = append(k1.Start, k2.Start...)
+		k1.Start.AddArgs(k2.LowerValue)
 	}
 	if k2.HaveUpper {
 		if k1.UpperOpen != k2.UpperOpen {
 			return fmt.Errorf("Kinds in ranges must all match")
 		}
-		k1.End = append(k1.End, k2.End...)
+		k1.End.AddArgs(k2.UpperValue)
 	}
 	return nil
 }
