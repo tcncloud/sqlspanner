@@ -31,15 +31,8 @@
 package sqlspanner
 
 import (
-	"fmt"
-	"strings"
 	"context"
 	"database/sql/driver"
-	"errors"
-
-	"github.com/Sirupsen/logrus"
-	"github.com/xwb1989/sqlparser"
-
 	"cloud.google.com/go/spanner"
 )
 
@@ -49,16 +42,7 @@ type conn struct {
 }
 
 func (c *conn) Prepare(query string) (driver.Stmt, error) {
-	pstmt, err := sqlparser.Parse(query)
-	if err != nil {
-		return nil, err
-	}
-
-	return &stmt{
-		conn:            c,
-		parsedStatement: pstmt,
-		origQuery:       query,
-	}, nil
+	return newStmt(query, c)
 }
 
 func (c *conn) Close() error {
@@ -92,162 +76,4 @@ func (c *conn) Ping(ctx context.Context) error {
 	return nil
 }
 
-// creates a spanner statement out of the given query string and and array of driver values
-// a spanner statment requires a Query with @ prefixed named args, instead of sql drivers ?
-// and for params it requires a map[string]interface{} intead of []driver.Value
-// Takes a query like: SELECT * FROM example_table WHERE a=?  OR b=? OR c=5
-// and turns it into: SELECT * FROM example_table WHERE a=@1 OR b=@2 OR c=5
-func (c *conn) Query(query string, args []driver.Value) (driver.Rows, error) {
-	var stmt spanner.Statement
-	if len(args) == 0 {
-		stmt = spanner.NewStatement(query)
-	} else {
-		spl := strings.Split(query, "?")
-		params := make(map[string]interface{})
-
-		if len(spl) != len(args) {
-			return nil, fmt.Errorf("number of ? in a query must match number of args provided")
-		}
-		updatedQuery := ""
-
-		for i := 0; i < len(spl) - 1; i++ {
-			namedIndex := fmt.Sprintf("@%d", i)
-			updatedQuery += (spl[i] + namedIndex)
-			params[namedIndex] = args[i]
-		}
-		updatedQuery += spl[len(spl) - 1]
-
-		stmt = spanner.Statement{
-			SQL: updatedQuery,
-			Params: params,
-		}
-	}
-	logrus.WithField("query", stmt.SQL).Debug("the query statement")
-	logrus.WithField("params", stmt.Params).Debug("the params")
-	iter := c.client.Single().Query(context.Background(), stmt)
-
-	return newRowsFromSpannerIterator(iter), nil
-}
-
-func (c *conn) Exec(query string, args []driver.Value) (driver.Result, error) {
-	logrus.WithFields(logrus.Fields{
-		"query": query,
-		"args":  args,
-	}).Debug("Executing query")
-	pstmt, err := sqlparser.Parse(query)
-	if err != nil {
-
-		return nil, err
-	}
-
-	switch stmt := pstmt.(type) {
-	case *sqlparser.Insert:
-		logrus.Debug("is an insert query")
-		return c.executeInsertQuery(stmt, args)
-	case *sqlparser.Update:
-		return c.executeUpdateQuery(stmt, args)
-	case *sqlparser.Delete:
-		logrus.Debug("is a delete query")
-		return c.executeDeleteQuery(stmt, args)
-	default:
-	}
-
-	return nil, errors.New(UnimplementedError)
-}
-
-func (c *conn) executeInsertQuery(insert *sqlparser.Insert, args []driver.Value) (driver.Result, error) {
-	logrus.WithField("stmt", insert).Debug("insert statement")
-	colNames, err := extractInsertColumns(insert)
-	if err != nil {
-		return nil, err
-	}
-	logrus.WithField("cols", colNames).Debug("column names")
-	tableName, err := extractIUDTableName(insert)
-	if err != nil {
-		return nil, err
-	}
-	logrus.WithField("tableName", tableName).Debug("table name")
-	values, err := extractInsertValues(insert, args)
-	if err != nil {
-		return nil, err
-	}
-	logrus.WithField("values", values).Debug("values")
-	// create a spanner mutation for the insert query
-	muts := make([]*spanner.Mutation, 1)
-	muts[0] = spanner.Insert(tableName, colNames, values)
-	// should probably support different contexts for querying spanner, inserts, deletes, and updates are slow
-	_, err = c.client.Apply(context.Background(), muts)
-	if err != nil {
-		return nil, err
-	}
-	//TODO:  find the last inserted id, and put it on the result
-	rowsAffected := int64(1)
-	return &result{
-		lastID:       nil,
-		rowsAffected: &rowsAffected,
-	}, nil
-}
-
-func (c *conn) executeDeleteQuery(del *sqlparser.Delete, args []driver.Value) (driver.Result, error) {
-	logrus.WithField("stmt", del).Debug("delete statment")
-	tableName, err := extractIUDTableName(del)
-	if err != nil {
-		return nil, err
-	}
-	logrus.WithField("tableName", tableName).Debug("table name")
-	keyset, err := extractSpannerKeyFromDelete(del, args)
-	if err != nil {
-		return nil, err
-	}
-	logrus.WithField("keyset", keyset).Debug("keyset")
-	muts := make([]*spanner.Mutation, 0)
-	for _, key := range keyset.Keys {
-		muts = append(muts, spanner.Delete(tableName, key))
-	}
-	for i, keyRange := range keyset.Ranges {
-		logrus.WithFields(logrus.Fields{
-			"i":     i,
-			"Start": keyRange.Start,
-			"End":   keyRange.End,
-			"Kind":  keyRange.Kind,
-		}).Debug("KEYRANGE")
-		muts = append(muts, spanner.DeleteKeyRange(tableName, keyRange))
-	}
-	_, err = c.client.Apply(context.Background(), muts)
-	if err != nil {
-		return nil, err
-	}
-	rowsAffected := int64(1)
-	return &result{
-		lastID:       nil,
-		rowsAffected: &rowsAffected,
-	}, nil
-}
-
-func (c *conn) executeUpdateQuery(up *sqlparser.Update, args []driver.Value) (driver.Result, error) {
-	logrus.WithField("stmt", up).Debug("update statement")
-	tableName, err := extractIUDTableName(up)
-	if err != nil {
-		return nil, err
-	}
-	logrus.WithField("tableName", tableName).Debug("table name")
-
-	upMap, err := extractUpdateClause(up, args)
-	if err != nil {
-		return nil, err
-	}
-
-	muts := make([]*spanner.Mutation, 1)
-	muts[0] = spanner.UpdateMap(tableName, upMap)
-	_, err = c.client.Apply(context.Background(), muts)
-	if err != nil {
-		return nil, err
-	}
-
-	rowsAffected := int64(1)
-	return &result{
-		lastID:       nil,
-		rowsAffected: &rowsAffected,
-	}, nil
-}
 
