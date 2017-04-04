@@ -40,20 +40,12 @@ import (
 
 
 type Args struct {
-	Values []driver.Value
 	Cur    int
 	Counter int
 }
 
 type ArgPlaceholder struct {
 	queuePos int
-}
-func (a *Args) Next() (interface{}, error) {
-	if a.Cur >= len(a.Values) {
-		return nil, fmt.Errorf("out of range")
-	}
-	a.Cur += 1
-	return a.Values[a.Cur-1], nil
 }
 
 func (a *Args) ParseValExpr(expr sqlparser.ValExpr) (interface{}, error) {
@@ -73,14 +65,7 @@ func (a *Args) ParseValExpr(expr sqlparser.ValExpr) (interface{}, error) {
 		} else {
 			return rv, nil
 		}
-	case sqlparser.ValArg: // a ?
-		//fmt.Printf("ValArg %+v\n", value)
-		//arg, err := a.Next()
-		//if err != nil {
-		//	return nil, fmt.Errorf("not enough arguments suplied to match query")
-		//}
-		//return arg, nil
-		//return nil, ProvidedValue
+	case sqlparser.ValArg: // ? arg to be supplied by the user
 		val := ArgPlaceholder{queuePos: a.Counter}
 		a.Counter += 1
 		return val, nil
