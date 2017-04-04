@@ -37,7 +37,7 @@ import (
 
 type updateMap struct {
 	updatedVals *partialArgMap
-	myArgs *Args
+	myArgs      *Args
 }
 
 // Spanner updates a particular row by being able to find the row by the primary key.

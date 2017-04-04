@@ -38,9 +38,8 @@ import (
 	"github.com/xwb1989/sqlparser"
 )
 
-
 type Args struct {
-	Cur    int
+	Cur     int
 	Counter int
 }
 
@@ -92,27 +91,27 @@ func (a *Args) ParseValExpr(expr sqlparser.ValExpr) (interface{}, error) {
 }
 
 type partialArgSlice struct {
-	args []interface{}
-	unfilled map[int]ArgPlaceholder
+	args         []interface{}
+	unfilled     map[int]ArgPlaceholder
 	expectedArgs int
 }
 
 type partialArgMap struct {
-	args map[string]interface{}
-	unfilled map[string]ArgPlaceholder
+	args         map[string]interface{}
+	unfilled     map[string]ArgPlaceholder
 	expectedArgs int
 }
 
 func newPartialArgSlice() *partialArgSlice {
 	return &partialArgSlice{
-		args: make([]interface{}, 0),
+		args:     make([]interface{}, 0),
 		unfilled: make(map[int]ArgPlaceholder),
 	}
 }
 
 func newPartialArgMap() *partialArgMap {
 	return &partialArgMap{
-		args: make(map[string]interface{}),
+		args:     make(map[string]interface{}),
 		unfilled: make(map[string]ArgPlaceholder),
 	}
 }
@@ -121,7 +120,7 @@ func (p *partialArgSlice) AddArgs(args ...interface{}) {
 	for _, arg := range args {
 		p.args = append(p.args, arg)
 		if ap, ok := arg.(ArgPlaceholder); ok {
-			p.unfilled[len(p.args) - 1] = ap
+			p.unfilled[len(p.args)-1] = ap
 			p.expectedArgs += 1
 		}
 	}
@@ -156,4 +155,3 @@ func (p *partialArgMap) GetFilledArgs(a []driver.Value) (map[string]interface{},
 	}
 	return p.args, nil
 }
-

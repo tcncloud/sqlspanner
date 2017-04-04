@@ -31,33 +31,33 @@
 package sqlspanner
 
 import (
+	"cloud.google.com/go/spanner"
 	"context"
 	"database/sql/driver"
 	"errors"
 	"fmt"
-	"strings"
 	"github.com/xwb1989/sqlparser"
-	"cloud.google.com/go/spanner"
+	"strings"
 )
 
 type stmt struct {
 	conn            *conn
 	parsedStatement sqlparser.Statement
 	origQuery       string
-	updatedQuery    string// for selects
+	updatedQuery    string // for selects
 	tableName       string
 	columnNames     []string
 	partialArgs     interface{}
 }
 
-func newStmt(query string, c *conn) (driver.Stmt, error){
+func newStmt(query string, c *conn) (driver.Stmt, error) {
 	pstmt, err := sqlparser.Parse(query)
 	if err != nil {
 		return nil, err
 	}
 	st := &stmt{
-		conn: c,
-		origQuery: query,
+		conn:            c,
+		origQuery:       query,
 		parsedStatement: pstmt,
 	}
 	switch s := pstmt.(type) {
@@ -94,7 +94,7 @@ func newStmt(query string, c *conn) (driver.Stmt, error){
 			return nil, err
 		}
 		tableName, err := extractIUDTableName(s)
-		if err !=nil {
+		if err != nil {
 			return nil, err
 		}
 		st.partialArgs = mkr
@@ -102,12 +102,12 @@ func newStmt(query string, c *conn) (driver.Stmt, error){
 	case *sqlparser.Select:
 		pArgMap := &partialArgMap{}
 		spl := strings.Split(query, "?")
-		for i := 0; i < len(spl) - 1; i++ {
+		for i := 0; i < len(spl)-1; i++ {
 			namedIndex := fmt.Sprintf("@%d", i)
 			st.updatedQuery += (spl[i] + namedIndex)
 			pArgMap.AddArg(namedIndex, ArgPlaceholder{queuePos: i})
 		}
-		st.updatedQuery += spl[len(spl) - 1]
+		st.updatedQuery += spl[len(spl)-1]
 		st.partialArgs = pArgMap
 	}
 	return st, nil
@@ -152,7 +152,7 @@ func (s *stmt) Query(args []driver.Value) (driver.Rows, error) {
 	if err != nil {
 		return nil, err
 	}
-	spannerStmt := spanner.Statement{ SQL: s.updatedQuery, Params: argsMap }
+	spannerStmt := spanner.Statement{SQL: s.updatedQuery, Params: argsMap}
 	iter := s.conn.client.Single().Query(context.Background(), spannerStmt)
 
 	return newRowsFromSpannerIterator(iter), nil
@@ -172,7 +172,7 @@ func (s *stmt) executeUpdateQuery(providedArgs []driver.Value) (driver.Result, e
 
 	rowsAffected := int64(1)
 	return &result{
-		lastID: nil,
+		lastID:       nil,
 		rowsAffected: &rowsAffected,
 	}, nil
 }
@@ -195,7 +195,7 @@ func (s *stmt) executeDeleteQuery(providedArgs []driver.Value) (driver.Result, e
 	// TODO: find actual number of rows affected
 	rowsAffected := int64(1)
 	return &result{
-		lastID: nil,
+		lastID:       nil,
 		rowsAffected: &rowsAffected,
 	}, nil
 }

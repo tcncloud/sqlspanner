@@ -31,9 +31,9 @@
 package sqlspanner
 
 import (
+	"cloud.google.com/go/spanner"
 	"context"
 	"database/sql/driver"
-	"cloud.google.com/go/spanner"
 )
 
 type conn struct {
@@ -75,5 +75,3 @@ func (c *conn) Ping(ctx context.Context) error {
 	}
 	return nil
 }
-
-

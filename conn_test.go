@@ -38,6 +38,7 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
+
 // Spanner costs money. So this database needs to be recreated every time we do testing
 // these var says we have a project setup of:
 // projectID: algebraic-ratio-149721
