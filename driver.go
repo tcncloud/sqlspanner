@@ -31,12 +31,13 @@
 package sqlspanner
 
 import (
+	"time"
 	"context"
 	"database/sql"
 	"database/sql/driver"
 
 	"github.com/Sirupsen/logrus"
-
+	"cloud.google.com/go/civil"
 	"cloud.google.com/go/spanner"
 )
 
@@ -61,4 +62,32 @@ func (d *drv) Open(name string) (driver.Conn, error) {
 		ctx:    ctx,
 		client: client,
 	}, nil
+}
+
+func IsValue(v interface{}) bool {
+	switch v.(type){
+	case int, int64, spanner.NullInt64:
+		return true
+	case string, spanner.NullString:
+		return true
+	case []string, []spanner.NullString:
+		return true
+	case []int, []int64, []spanner.NullInt64:
+		return true
+	case bool, spanner.NullBool:
+		return true
+	case float64, spanner.NullFloat64:
+		return true
+	case []float64, []spanner.NullFloat64:
+		return true
+	case time.Time, spanner.NullTime:
+		return true
+	case []time.Time, []spanner.NullTime:
+		return true
+	case civil.Date, []civil.Date:
+		return true
+	case nil:
+		return true
+	}
+	return false
 }
