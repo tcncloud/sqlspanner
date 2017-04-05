@@ -58,25 +58,32 @@ var spannerTestDatabase = "projects/algebraic-ratio-149721/instances/test-instan
 var _ = Describe("Conn", func() {
 	Describe("given a db connection ", func() {
 		conn, err := sql.Open("spanner", spannerTestDatabase)
+
 		It("should connect succesfuly", func() {
 			Expect(err).To(BeNil())
 		})
+
 		It("should be able to ping", func() {
 			Expect(conn.Ping()).To(BeNil())
 		})
+
 		It("should be able to execute an insert statement", func() {
 			_, err := conn.Exec("INSERT INTO test_table1(id, simple_string) VALUES(?, ?)", 1, "test_string")
 			Expect(err).To(BeNil())
 		})
+
 		It("should be able to execute a select statement", func() {
 			rows, err := conn.Query("SELECT * FROM test_table1")
+
 			Expect(err).To(BeNil())
 			Expect(rows.Columns()).To(BeEquivalentTo([]string{"id", "simple_string"}))
 			hasNext := rows.Next()
+
 			Expect(hasNext).To(Equal(true))
 			Expect(rows.Err()).To(BeNil())
 			var id int64
 			var s string
+
 			rows.Scan(&id, &s)
 			Expect(id).To(Equal(int64(1)))
 			Expect(s).To(Equal("test_string"))
@@ -85,19 +92,23 @@ var _ = Describe("Conn", func() {
 			err = rows.Close()
 			Expect(err).To(BeNil())
 		})
+
 		It("should be able to execute an update statement", func() {
 			_, err = conn.Exec(`UPDATE test_table1 SET simple_string=? WHERE id=1`, "changed test string")
 			Expect(err).To(BeNil())
 		})
+
 		It("should be able to execute a delete statement", func() {
 			_, err = conn.Exec("DELETE FROM test_table1 WHERE id = 1 ", nil)
 			Expect(err).To(BeNil())
 		})
+
 		It("should be able to insert more complex record, and retrieve it", func() {
 			_, err := conn.Exec(`INSERT INTO test_table2(id, id_string, simple_string, items)
 				VALUES(1, ?, "test_string", ?)`, "1", []string{"string1", "string2"})
 			Expect(err).To(BeNil())
 			row := conn.QueryRow(`SELECT * FROM test_table2 LIMIT 1`)
+
 			var id int64
 			var id_string, simple_string string
 			var items []spanner.NullString
@@ -112,6 +123,27 @@ var _ = Describe("Conn", func() {
 				spanner.NullString{StringVal: "string2", Valid: true},
 			}))
 		})
+
+		It("should be able to update more complex record, and retrieve updated row", func() {
+			arg := []spanner.NullString{
+				spanner.NullString{StringVal: "changedstring1", Valid: true},
+				spanner.NullString{StringVal: "", Valid: false},
+			}
+			_, err := conn.Exec(`UPDATE test_table2 SET items=? WHERE id = 1 AND id_string = "1"`, arg)
+			Expect(err).To(BeNil())
+
+			row := conn.QueryRow(`SELECT items FROM test_table2 WHERE id = 1 AND id_string = "1"`)
+
+			var items []spanner.NullString
+
+			err = row.Scan(&items)
+			Expect(err).To(BeNil())
+			Expect(items).To(BeEquivalentTo([]spanner.NullString{
+				spanner.NullString{StringVal: "changedstring1", Valid: true},
+				spanner.NullString{StringVal: "", Valid: false},
+			}))
+		})
+
 		It("can delete", func() {
 			_, err := conn.Exec(`DELETE FROM test_table2 WHERE id = 1 AND id_string = "1"`)
 			Expect(err).To(BeNil())
