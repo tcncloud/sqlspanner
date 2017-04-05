@@ -215,6 +215,7 @@ func (s *stmt) executeUpdateQuery(providedArgs []driver.Value) (driver.Result, e
 	}
 	muts := make([]*spanner.Mutation, 1)
 	muts[0] = spanner.UpdateMap(s.tableName, argsMap)
+	_, err = s.conn.client.Apply(context.Background(), muts)
 
 	rowsAffected := int64(1)
 	return &result{
