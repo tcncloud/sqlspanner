@@ -148,5 +148,36 @@ var _ = Describe("Conn", func() {
 			_, err := conn.Exec(`DELETE FROM test_table2 WHERE id = 1 AND id_string = "1"`)
 			Expect(err).To(BeNil())
 		})
+
+		It("can delete a range of things", func() {
+			_, err := conn.Exec(`INSERT into test_table2 (id, id_string, simple_string)
+				VALUES (1, "1", "test_string1")`)
+			Expect(err).To(BeNil())
+			_, err = conn.Exec(`INSERT into test_table2 (id, id_string, simple_string)
+				VALUES (1, "2", "test_string2")`)
+			Expect(err).To(BeNil())
+			_, err = conn.Exec(`INSERT into test_table2 (id, id_string, simple_string)
+				VALUES (1, "3", "test_string3")`)
+			Expect(err).To(BeNil())
+			_, err = conn.Exec(`DELETE FROM test_table2 WHERE id = 1 AND id_string >= 1 AND id_string <= 2`)
+			Expect(err).To(BeNil())
+			rows, err := conn.Query(`SELECT simple_string from test_table2`)
+			Expect(err).To(BeNil())
+
+			hasNext := rows.Next()
+
+			Expect(hasNext).To(Equal(true))
+			Expect(rows.Err()).To(BeNil())
+			var simple_string string
+
+			err = rows.Scan(&simple_string)
+			Expect(err).To(BeNil())
+
+			Expect(simple_string).To(Equal("test_string3"))
+			hasNext = rows.Next()
+			Expect(hasNext).To(Equal(false))
+			_, err = conn.Exec(`DELETE FROM test_table2 WHERE id = 1 AND id_string = "3"`)
+			Expect(err).To(BeNil())
+		})
 	})
 })
