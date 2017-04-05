@@ -48,6 +48,8 @@ type stmt struct {
 	tableName       string
 	columnNames     []string
 	partialArgs     interface{}
+	colTypes        map[int]interface{}
+	currentCol      int
 }
 
 func newStmt(query string, c *conn) (driver.Stmt, error) {
@@ -59,6 +61,11 @@ func newStmt(query string, c *conn) (driver.Stmt, error) {
 		conn:            c,
 		origQuery:       query,
 		parsedStatement: pstmt,
+		// stores the raw values for each column at the position as they are passed
+		// to the statement. This gets rid of the restriction of driver.Value default types
+		colTypes:        make(map[int]interface{}),
+		// the current col in the row we are editing
+		currentCol:      -1,
 	}
 	switch s := pstmt.(type) {
 	case *sqlparser.Insert:
@@ -113,6 +120,26 @@ func newStmt(query string, c *conn) (driver.Stmt, error) {
 	return st, nil
 }
 
+// sets the currentColumn we are editing and passes the statement back
+// as a ValueConverter
+func (s *stmt) ColumnConverter(idx int) driver.ValueConverter {
+	s.currentCol = idx
+	return s
+}
+// stores v as the value at the current index after confirming v
+// can fit in spanner, and that the statements current column has
+// been set to be used as a ColumnConverter.
+func (s *stmt) ConvertValue(v interface{}) (driver.Value, error) {
+	if s.currentCol == -1 {
+		return nil, fmt.Errorf("cannot call ConvertValue without setting ColumnConvert index")
+	}
+	if IsValue(v) {
+		s.colTypes[s.currentCol] = v
+	}
+	fmt.Printf("coltypes: %+v\n", s.colTypes)
+	return nil, nil
+}
+
 func (s *stmt) Close() error {
 	return errors.New(UnimplementedError)
 }
@@ -122,6 +149,8 @@ func (s *stmt) NumInput() int {
 }
 
 func (s *stmt) Exec(args []driver.Value) (driver.Result, error) {
+	fmt.Printf("args now: %+v", args)
+	args = s.getCachedArgs(args)
 	switch s.parsedStatement.(type) {
 	case *sqlparser.Insert:
 		return s.executeInsertQuery(args)
@@ -134,12 +163,15 @@ func (s *stmt) Exec(args []driver.Value) (driver.Result, error) {
 	}
 }
 
+
 // creates a spanner statement out of the given query string and and array of driver values
 // a spanner statment requires a Query with @ prefixed named args, instead of sql drivers ?
 // and for params it requires a map[string]interface{} intead of []driver.Value
 // Takes a query like: SELECT * FROM example_table WHERE a=?  OR b=? OR c=5
 // and turns it into: SELECT * FROM example_table WHERE a=@1 OR b=@2 OR c=5
 func (s *stmt) Query(args []driver.Value) (driver.Rows, error) {
+	args = s.getCachedArgs(args)
+	fmt.Printf("args now: %+v\n", args)
 	_, ok := s.parsedStatement.(*sqlparser.Select)
 	if !ok {
 		return nil, fmt.Errorf("not a query-able query (not a select statment)")
@@ -156,6 +188,20 @@ func (s *stmt) Query(args []driver.Value) (driver.Rows, error) {
 	iter := s.conn.client.Single().Query(context.Background(), spannerStmt)
 
 	return newRowsFromSpannerIterator(iter), nil
+}
+
+// pull out the args that are stored in stmt.colTypes by the ConvertValue  function
+//  driver.Statements are not used by multiple go routines concurrently
+func (s *stmt) getCachedArgs(args []driver.Value) ([]driver.Value) {
+	fmt.Println("in cached args")
+	if s.currentCol != -1 {
+		for i := 0; i < len(args); i++ {
+			fmt.Printf("converting args[%d] to %+v", i, s.colTypes[i])
+			args[i] = s.colTypes[i]
+		}
+		s.currentCol = -1
+	}
+	return args
 }
 
 func (s *stmt) executeUpdateQuery(providedArgs []driver.Value) (driver.Result, error) {
