@@ -34,6 +34,7 @@ import (
 	_ "github.com/tcncloud/sqlspanner"
 
 	"database/sql"
+	"cloud.google.com/go/spanner"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -90,6 +91,29 @@ var _ = Describe("Conn", func() {
 		})
 		It("should be able to execute a delete statement", func() {
 			_, err = conn.Exec("DELETE FROM test_table1 WHERE id = 1 ", nil)
+			Expect(err).To(BeNil())
+		})
+		It("should be able to insert more complex record, and retrieve it", func() {
+			_, err := conn.Exec(`INSERT INTO test_table2(id, id_string, simple_string, items)
+				VALUES(1, ?, "test_string", ?)`, "1", []string{"string1", "string2"})
+			Expect(err).To(BeNil())
+			row := conn.QueryRow(`SELECT * FROM test_table2 LIMIT 1`)
+			var id int64
+			var id_string, simple_string string
+			var items []spanner.NullString
+
+			err = row.Scan(&id, &id_string, &items, &simple_string)
+			Expect(err).To(BeNil())
+			Expect(id).To(Equal(int64(1)))
+			Expect(id_string).To(Equal("1"))
+			Expect(simple_string).To(Equal("test_string"))
+			Expect(items).To(BeEquivalentTo([]spanner.NullString{
+				spanner.NullString{StringVal: "string1", Valid: true},
+				spanner.NullString{StringVal: "string2", Valid: true},
+			}))
+		})
+		It("can delete", func() {
+			_, err := conn.Exec(`DELETE FROM test_table2 WHERE id = 1 AND id_string = "1"`)
 			Expect(err).To(BeNil())
 		})
 	})
