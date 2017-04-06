@@ -91,3 +91,18 @@ func IsValue(v interface{}) bool {
 	}
 	return false
 }
+
+func needsEncoding(v interface{}) bool {
+	switch v.(type) {
+	case int, []string, []int, []int64, []bool, []float64, []time.Time:
+		return true
+	case civil.Date, spanner.NullInt64, spanner.NullString, spanner.NullFloat64:
+		return true
+	case []civil.Date, []spanner.NullTime, []spanner.NullInt64, []spanner.NullString:
+		return true
+	case []spanner.NullFloat64, []spanner.NullBool:
+		return true
+	}
+	return false
+}
+
