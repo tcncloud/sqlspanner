@@ -33,9 +33,59 @@ package sqlspanner_test
 import (
 	// . "github.com/tcncloud/sqlspanner"
 
+	"database/sql"
 	. "github.com/onsi/ginkgo"
-	// . "github.com/onsi/gomega"
+	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("Stmt", func() {
+	Describe("given a db connection", func() {
+		conn, err := sql.Open("spanner", spannerTestDatabase)
+
+		It("should connect successfully", func() {
+			Expect(err).To(BeNil())
+		})
+		It("can be used multiple times with different parameters", func() {
+			stmt, err := conn.Prepare("INSERT INTO test_table1 (id, simple_string) VALUES(?, ?)")
+			Expect(err).To(BeNil())
+
+			_, err = stmt.Exec(1, "string1")
+			Expect(err).To(BeNil())
+			_, err = stmt.Exec(2, "string2")
+			Expect(err).To(BeNil())
+			err = stmt.Close()
+			Expect(err).To(BeNil())
+
+			stmt, err = conn.Prepare("SELECT id, simple_string FROM test_table1 WHERE id=? LIMIT 1")
+			Expect(err).To(BeNil())
+
+			var id int64
+			var simple_string string
+
+			row := stmt.QueryRow(1)
+			err = row.Scan(&id, &simple_string)
+			Expect(err).To(BeNil())
+			Expect(id).To(Equal(int64(1)))
+			Expect(simple_string).To(Equal("string1"))
+
+			row = stmt.QueryRow(1)
+			err = row.Scan(&id, &simple_string)
+			Expect(err).To(BeNil())
+			Expect(id).To(Equal(int64(2)))
+			Expect(simple_string).To(Equal("string2"))
+		})
+
+		It("can delete using statement mutliple times", func() {
+			stmt, err := conn.Prepare("DELETE FROM test_table1 WHERE id=?")
+			Expect(err).To(BeNil())
+
+			_, err = stmt.Exec(1)
+			Expect(err).To(BeNil())
+			_, err = stmt.Exec(2)
+			Expect(err).To(BeNil())
+
+			_, err = conn.Query("SELECT * FROM test_table1")
+			Expect(err).To(Equal(sql.ErrNoRows))
+		})
+	})
 })
