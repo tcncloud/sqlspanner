@@ -34,7 +34,6 @@ import (
 	"cloud.google.com/go/spanner"
 	"context"
 	"database/sql/driver"
-	"errors"
 	"fmt"
 	"github.com/xwb1989/sqlparser"
 	"strings"
@@ -48,7 +47,7 @@ type stmt struct {
 	tableName       string
 	columnNames     []string
 	partialArgs     interface{}
-	colTypes        map[int]interface{}
+	tce             *typeCacheEncoder
 	currentCol      int
 }
 
@@ -63,7 +62,7 @@ func newStmt(query string, c *conn) (driver.Stmt, error) {
 		parsedStatement: pstmt,
 		// stores the raw values for each column at the position as they are passed
 		// to the statement. This gets rid of the restriction of driver.Value default types
-		colTypes:        make(map[int]interface{}),
+		tce:             newTypeCacheEncoder(),
 		// the current col in the row we are editing
 		currentCol:      -1,
 	}
@@ -134,14 +133,14 @@ func (s *stmt) ConvertValue(v interface{}) (driver.Value, error) {
 		return nil, fmt.Errorf("cannot call ConvertValue without setting ColumnConvert index")
 	}
 	if IsValue(v) {
-		s.colTypes[s.currentCol] = v
+		return s.tce.encodeCol(s.currentCol, v)
 	}
-	fmt.Printf("coltypes: %+v\n", s.colTypes)
-	return nil, nil
+	return nil, fmt.Errorf("value will not fit in spanner %#v", v)
 }
 
+// a statement doesnt have to do anything special to close it
 func (s *stmt) Close() error {
-	return errors.New(UnimplementedError)
+	return nil
 }
 
 func (s *stmt) NumInput() int {
@@ -150,7 +149,10 @@ func (s *stmt) NumInput() int {
 
 func (s *stmt) Exec(args []driver.Value) (driver.Result, error) {
 	fmt.Printf("args now: %+v", args)
-	args = s.getCachedArgs(args)
+	args, err := s.getCachedArgs(args)
+	if err != nil {
+		return nil, err
+	}
 	switch s.parsedStatement.(type) {
 	case *sqlparser.Insert:
 		return s.executeInsertQuery(args)
@@ -170,7 +172,10 @@ func (s *stmt) Exec(args []driver.Value) (driver.Result, error) {
 // Takes a query like: SELECT * FROM example_table WHERE a=?  OR b=? OR c=5
 // and turns it into: SELECT * FROM example_table WHERE a=@1 OR b=@2 OR c=5
 func (s *stmt) Query(args []driver.Value) (driver.Rows, error) {
-	args = s.getCachedArgs(args)
+	args, err := s.getCachedArgs(args)
+	if err != nil {
+		return nil, err
+	}
 	fmt.Printf("args now: %+v\n", args)
 	_, ok := s.parsedStatement.(*sqlparser.Select)
 	if !ok {
@@ -190,18 +195,24 @@ func (s *stmt) Query(args []driver.Value) (driver.Rows, error) {
 	return newRowsFromSpannerIterator(iter), nil
 }
 
-// pull out the args that are stored in stmt.colTypes by the ConvertValue  function
+// pull out the args that are stored in stmt's typeCacheEncoder by the ConvertValue  function
 //  driver.Statements are not used by multiple go routines concurrently
-func (s *stmt) getCachedArgs(args []driver.Value) ([]driver.Value) {
+func (s *stmt) getCachedArgs(args []driver.Value) ([]driver.Value, error) {
 	fmt.Println("in cached args")
 	if s.currentCol != -1 {
 		for i := 0; i < len(args); i++ {
-			fmt.Printf("converting args[%d] to %+v", i, s.colTypes[i])
-			args[i] = s.colTypes[i]
+			if bs, ok := args[i].([]byte); ok {
+				arg, err := s.tce.decodeCol(i, bs)
+				if err != nil {
+					return nil, err
+				}
+				fmt.Printf("converting args[%d] to %+v", i, arg)
+				args[i] = arg
+			}
 		}
 		s.currentCol = -1
 	}
-	return args
+	return args, nil
 }
 
 func (s *stmt) executeUpdateQuery(providedArgs []driver.Value) (driver.Result, error) {
