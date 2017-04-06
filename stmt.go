@@ -106,7 +106,7 @@ func newStmt(query string, c *conn) (driver.Stmt, error) {
 		st.partialArgs = mkr
 		st.tableName = tableName
 	case *sqlparser.Select:
-		pArgMap := &partialArgMap{}
+		pArgMap := newPartialArgMap()
 		spl := strings.Split(query, "?")
 		for i := 0; i < len(spl)-1; i++ {
 			namedIndex := fmt.Sprintf("@%d", i)
