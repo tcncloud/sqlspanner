@@ -113,39 +113,5 @@ var _ = Describe("Rows", func() {
 				})
 			})
 		})
-		Describe("with spanner.Row", func() {
-			Describe("with populated row", func() {
-				It("sets cols field", func() {
-
-				})
-
-				It("sets row field", func() {
-
-				})
-
-				It("does not set err field", func() {
-
-				})
-
-				It("sets valuer field", func() {
-
-				})
-			})
-
-			Describe("with nil row", func() {
-				It("does not set cols field", func() {
-
-				})
-
-				It("does not set row field", func() {
-
-				})
-
-				It("sets err field to io.EOF", func() {
-
-				})
-			})
-		})
-
 	})
 })
