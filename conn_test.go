@@ -107,7 +107,7 @@ var _ = Describe("Conn", func() {
 			_, err := conn.Exec(`INSERT INTO test_table2(id, id_string, simple_string, items)
 				VALUES(1, ?, "test_string", ?)`, "1", []string{"string1", "string2"})
 			Expect(err).To(BeNil())
-			row := conn.QueryRow(`SELECT * FROM test_table2 LIMIT 1`)
+			row := conn.QueryRow(`SELECT id, id_string, items, simple_string FROM test_table2 LIMIT 1`)
 
 			var id int64
 			var id_string, simple_string string
