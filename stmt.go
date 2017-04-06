@@ -133,7 +133,10 @@ func (s *stmt) ConvertValue(v interface{}) (driver.Value, error) {
 		return nil, fmt.Errorf("cannot call ConvertValue without setting ColumnConvert index")
 	}
 	if IsValue(v) {
-		return s.tce.encodeCol(s.currentCol, v)
+		if needsEncoding(v) {
+			return s.tce.encodeCol(s.currentCol, v)
+		}
+		return v, nil
 	}
 	return nil, fmt.Errorf("value will not fit in spanner %#v", v)
 }
@@ -201,13 +204,15 @@ func (s *stmt) getCachedArgs(args []driver.Value) ([]driver.Value, error) {
 	fmt.Println("in cached args")
 	if s.currentCol != -1 {
 		for i := 0; i < len(args); i++ {
-			if bs, ok := args[i].([]byte); ok {
+			if bs, ok := args[i].([]byte); ok && s.tce.haveCol(i){
 				arg, err := s.tce.decodeCol(i, bs)
 				if err != nil {
 					return nil, err
 				}
-				fmt.Printf("converting args[%d] to %+v", i, arg)
+				fmt.Printf("converting args[%d] to %+v\n", i, arg)
 				args[i] = arg
+			} else {
+				fmt.Printf("already have arg[%d]: %#v\n", i, args[i])
 			}
 		}
 		s.currentCol = -1
