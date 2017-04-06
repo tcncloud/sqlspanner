@@ -60,3 +60,7 @@ func (t *typeCacheEncoder) decodeCol(i int, bs []byte) (interface{}, error) {
 	return out.Elem().Interface(), nil
 }
 
+func (t *typeCacheEncoder) haveCol(i int) bool {
+	_, isSet := t.types[i]
+	return isSet
+}
